@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import FloatingFrame from './FloatingFrame';
 import { searchAction, SearchResult } from './actions/searchAction';
 import { fetchDOMProductsAction, FetchProductsResult } from './actions/fetchDOMProductsAction';
+import { fetchLayoutAction, FetchLayoutResult } from './actions/fetchLayoutAction';
 
 export class FloatingFrameManager {
   private shadowHost: HTMLDivElement | null = null;
@@ -55,13 +56,14 @@ export class FloatingFrameManager {
       reactContainer.id = 'floating-frame-react-root';
       this.shadowRoot.appendChild(reactContainer);
 
-      // Mount React component with search and fetch products functionality
+      // Mount React component with all functionality
       this.reactRoot = createRoot(reactContainer);
       this.reactRoot.render(
         React.createElement(FloatingFrame, {
           onClose: () => this.removeFrame(),
           onSearch: this.handleSearch.bind(this),
-          onFetchProducts: this.handleFetchProducts.bind(this)
+          onFetchProducts: this.handleFetchProducts.bind(this),
+          onFetchLayout: this.handleFetchLayout.bind(this)
         })
       );
 
@@ -69,7 +71,7 @@ export class FloatingFrameManager {
       document.body.appendChild(this.shadowHost);
       this.isInjected = true;
 
-      console.log('Floating frame with search and product extraction functionality injected successfully');
+      console.log('Floating frame with full functionality injected successfully');
     } catch (error) {
       console.error('Failed to inject floating frame:', error);
       this.cleanup();
@@ -103,6 +105,22 @@ export class FloatingFrameManager {
         success: false,
         message: `Failed to fetch products: ${error instanceof Error ? error.message : 'Unknown error'}`,
         count: 0
+      };
+    }
+  }
+
+  private async handleFetchLayout(): Promise<FetchLayoutResult> {
+    try {
+      console.log('Fetching DOM layout structure...');
+      const result = await fetchLayoutAction();
+      console.log('Fetch layout result:', result);
+      return result;
+    } catch (error) {
+      console.error('Fetch layout action failed:', error);
+      return {
+        success: false,
+        message: `Failed to fetch layout: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        totalElements: 0
       };
     }
   }
@@ -446,6 +464,90 @@ export class FloatingFrameManager {
         color: #374151;
       }
 
+      .layout-container {
+        max-height: 400px;
+        overflow-y: auto;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        background: #f9fafb;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 12px;
+      }
+
+      .layout-summary {
+        padding: 12px;
+        background: white;
+        border-bottom: 1px solid #e5e7eb;
+        margin-bottom: 8px;
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .summary-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 8px;
+        background: #f3f4f6;
+        border-radius: 4px;
+        font-size: 11px;
+      }
+
+      .summary-label {
+        color: #6b7280;
+        font-weight: 500;
+      }
+
+      .summary-value {
+        color: #1f2937;
+        font-weight: 600;
+      }
+
+      .layout-tree {
+        padding: 12px;
+      }
+
+      .layout-element {
+        margin-bottom: 4px;
+        line-height: 1.4;
+      }
+
+      .element-tag {
+        color: #dc2626;
+        font-weight: 600;
+      }
+
+      .element-id {
+        color: #2563eb;
+        font-weight: 500;
+      }
+
+      .element-class {
+        color: #059669;
+      }
+
+      .element-role {
+        color: #7c3aed;
+        font-style: italic;
+      }
+
+      .element-text {
+        color: #374151;
+        background: #f9fafb;
+        padding: 2px 4px;
+        border-radius: 2px;
+        margin-left: 4px;
+      }
+
+      .element-invisible {
+        opacity: 0.5;
+        text-decoration: line-through;
+      }
+
       .feature-list {
         list-style: none;
         padding: 0;
@@ -513,6 +615,15 @@ export class FloatingFrameManager {
       .fetch-products-button:hover:not(:disabled) {
         background: #047857;
         box-shadow: 0 4px 8px rgba(5, 150, 105, 0.3);
+      }
+
+      .fetch-layout-button {
+        background: #7c3aed;
+      }
+
+      .fetch-layout-button:hover:not(:disabled) {
+        background: #6d28d9;
+        box-shadow: 0 4px 8px rgba(124, 58, 237, 0.3);
       }
 
       .button-spinner {
@@ -605,6 +716,10 @@ export class FloatingFrameManager {
         .product-header {
           flex-direction: column;
           align-items: flex-start;
+        }
+
+        .summary-grid {
+          grid-template-columns: 1fr;
         }
       }
 

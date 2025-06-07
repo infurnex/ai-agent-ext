@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
-import { X, Minimize2, Maximize2, Search, Package } from 'lucide-react';
+import { X, Minimize2, Maximize2, Search, Package, Layout } from 'lucide-react';
 import { SearchResult } from './actions/searchAction';
 import { FetchProductsResult, Product } from './actions/fetchDOMProductsAction';
+import { FetchLayoutResult, LayoutElement } from './actions/fetchLayoutAction';
 
 interface FloatingFrameProps {
   onClose?: () => void;
   onSearch?: (query: string) => Promise<SearchResult>;
   onFetchProducts?: () => Promise<FetchProductsResult>;
+  onFetchLayout?: () => Promise<FetchLayoutResult>;
 }
 
-const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch, onFetchProducts }) => {
+const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch, onFetchProducts, onFetchLayout }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -18,6 +20,9 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch, o
   const [productsResult, setProductsResult] = useState<FetchProductsResult | null>(null);
   const [isFetchingProducts, setIsFetchingProducts] = useState(false);
   const [showProducts, setShowProducts] = useState(false);
+  const [layoutResult, setLayoutResult] = useState<FetchLayoutResult | null>(null);
+  const [isFetchingLayout, setIsFetchingLayout] = useState(false);
+  const [showLayout, setShowLayout] = useState(false);
   const frameRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -88,6 +93,31 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch, o
     }
   }, [onFetchProducts]);
 
+  // Handle fetch layout
+  const handleFetchLayout = useCallback(async () => {
+    if (!onFetchLayout) return;
+    
+    setIsFetchingLayout(true);
+    setLayoutResult(null);
+    setShowLayout(false);
+    
+    try {
+      const result = await onFetchLayout();
+      setLayoutResult(result);
+      if (result.success && result.layout) {
+        setShowLayout(true);
+      }
+    } catch (error) {
+      setLayoutResult({
+        success: false,
+        message: 'Failed to fetch layout due to an error',
+        totalElements: 0
+      });
+    } finally {
+      setIsFetchingLayout(false);
+    }
+  }, [onFetchLayout]);
+
   // Handle search input change
   const handleSearchInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
@@ -110,6 +140,40 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch, o
     setShowProducts(prev => !prev);
   }, []);
 
+  // Toggle layout view
+  const toggleLayoutView = useCallback(() => {
+    setShowLayout(prev => !prev);
+  }, []);
+
+  // Render layout element tree
+  const renderLayoutElement = useCallback((element: LayoutElement, index: number = 0): React.ReactNode => {
+    const indent = '  '.repeat(element.depth);
+    const hasChildren = element.children.length > 0;
+    
+    return (
+      <div key={index} className={`layout-element ${!element.isVisible ? 'element-invisible' : ''}`}>
+        <span style={{ marginLeft: `${element.depth * 12}px` }}>
+          <span className="element-tag">&lt;{element.tagName}</span>
+          {element.id && <span className="element-id"> id="{element.id}"</span>}
+          {element.className && <span className="element-class"> class="{element.className.length > 30 ? element.className.substring(0, 30) + '...' : element.className}"</span>}
+          <span className="element-tag">&gt;</span>
+          <span className="element-role"> [{element.semanticRole}]</span>
+          {element.textContent && (
+            <span className="element-text">"{element.textContent.length > 20 ? element.textContent.substring(0, 20) + '...' : element.textContent}"</span>
+          )}
+        </span>
+        {hasChildren && element.depth < 3 && element.children.map((child, childIndex) => 
+          renderLayoutElement(child, childIndex)
+        )}
+        {hasChildren && element.depth >= 3 && (
+          <div style={{ marginLeft: `${(element.depth + 1) * 12}px`, color: '#9ca3af', fontStyle: 'italic' }}>
+            ... {element.children.length} more children
+          </div>
+        )}
+      </div>
+    );
+  }, []);
+
   if (isLoading) {
     return (
       <div className="floating-frame-loading">
@@ -126,7 +190,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch, o
       {/* Header */}
       <div className="floating-frame-header">
         <div className="header-content">
-          <span className="header-title">Product Assistant</span>
+          <span className="header-title">DOM Assistant</span>
         </div>
         <div className="header-controls">
           <button
@@ -272,13 +336,124 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch, o
               </div>
             )}
           </div>
+
+          {/* Fetch Layout Section */}
+          <div className="content-section">
+            <h3 className="section-title">Extract Layout</h3>
+            <p className="section-description">
+              Analyze the DOM structure and extract semantic layout information.
+            </p>
+            
+            <div className="action-buttons">
+              <button 
+                className="primary-button fetch-layout-button"
+                onClick={handleFetchLayout}
+                disabled={isFetchingLayout}
+              >
+                {isFetchingLayout ? (
+                  <>
+                    <div className="button-spinner"></div>
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <Layout size={16} />
+                    Fetch Layout
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Layout Result */}
+            {layoutResult && (
+              <div className={`search-result ${layoutResult.success ? 'success' : 'error'}`}>
+                <p className="result-message">{layoutResult.message}</p>
+                {layoutResult.totalElements !== undefined && (
+                  <p className="result-details">
+                    Total elements: {layoutResult.totalElements}
+                  </p>
+                )}
+                {layoutResult.success && layoutResult.layout && (
+                  <button 
+                    className="toggle-products-button"
+                    onClick={toggleLayoutView}
+                  >
+                    {showLayout ? 'Hide Layout' : 'Show Layout'}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Layout Tree */}
+            {showLayout && layoutResult?.layout && (
+              <div className="products-list">
+                <h4 className="subsection-title">DOM Layout Structure</h4>
+                <div className="layout-container">
+                  {/* Semantic Summary */}
+                  {layoutResult.semanticSummary && (
+                    <div className="layout-summary">
+                      <h5 className="subsection-title">Semantic Summary</h5>
+                      <div className="summary-grid">
+                        <div className="summary-item">
+                          <span className="summary-label">Headers:</span>
+                          <span className="summary-value">{layoutResult.semanticSummary.headers}</span>
+                        </div>
+                        <div className="summary-item">
+                          <span className="summary-label">Navigation:</span>
+                          <span className="summary-value">{layoutResult.semanticSummary.navigation}</span>
+                        </div>
+                        <div className="summary-item">
+                          <span className="summary-label">Main:</span>
+                          <span className="summary-value">{layoutResult.semanticSummary.main}</span>
+                        </div>
+                        <div className="summary-item">
+                          <span className="summary-label">Sections:</span>
+                          <span className="summary-value">{layoutResult.semanticSummary.sections}</span>
+                        </div>
+                        <div className="summary-item">
+                          <span className="summary-label">Articles:</span>
+                          <span className="summary-value">{layoutResult.semanticSummary.articles}</span>
+                        </div>
+                        <div className="summary-item">
+                          <span className="summary-label">Forms:</span>
+                          <span className="summary-value">{layoutResult.semanticSummary.forms}</span>
+                        </div>
+                        <div className="summary-item">
+                          <span className="summary-label">Buttons:</span>
+                          <span className="summary-value">{layoutResult.semanticSummary.buttons}</span>
+                        </div>
+                        <div className="summary-item">
+                          <span className="summary-label">Links:</span>
+                          <span className="summary-value">{layoutResult.semanticSummary.links}</span>
+                        </div>
+                        <div className="summary-item">
+                          <span className="summary-label">Images:</span>
+                          <span className="summary-value">{layoutResult.semanticSummary.images}</span>
+                        </div>
+                        <div className="summary-item">
+                          <span className="summary-label">Lists:</span>
+                          <span className="summary-value">{layoutResult.semanticSummary.lists}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Layout Tree */}
+                  <div className="layout-tree">
+                    {renderLayoutElement(layoutResult.layout)}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
           
           <div className="content-section">
             <h4 className="subsection-title">Features</h4>
             <ul className="feature-list">
               <li>Smart search input detection</li>
               <li>Product information extraction</li>
-              <li>DOM element analysis</li>
+              <li>DOM layout analysis</li>
+              <li>Semantic element classification</li>
               <li>Add to cart button detection</li>
               <li>Real-time feedback</li>
             </ul>
@@ -299,6 +474,8 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch, o
                   setSearchResult(null);
                   setProductsResult(null);
                   setShowProducts(false);
+                  setLayoutResult(null);
+                  setShowLayout(false);
                 }}
               >
                 Clear All
