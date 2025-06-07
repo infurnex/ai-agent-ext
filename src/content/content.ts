@@ -113,13 +113,6 @@ class FloatingFrameManager {
         height: 60px;
       }
 
-      .floating-frame.dragging {
-        cursor: grabbing;
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-        transform-origin: center;
-        scale: 1.02;
-      }
-
       .floating-frame-header {
         display: flex;
         align-items: center;
@@ -127,13 +120,8 @@ class FloatingFrameManager {
         padding: 12px 16px;
         background: rgba(37, 99, 235, 0.05);
         border-bottom: 1px solid rgba(37, 99, 235, 0.1);
-        cursor: grab;
         user-select: none;
         min-height: 60px;
-      }
-
-      .floating-frame-header:active {
-        cursor: grabbing;
       }
 
       .header-content {
@@ -143,11 +131,6 @@ class FloatingFrameManager {
         color: #374151;
         font-weight: 500;
         font-size: 14px;
-      }
-
-      .drag-icon {
-        color: #6b7280;
-        opacity: 0.7;
       }
 
       .header-title {
