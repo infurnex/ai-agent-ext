@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import FloatingFrame from './FloatingFrame';
+import { searchAction, SearchResult } from './actions/searchAction';
 
 export class FloatingFrameManager {
   private shadowHost: HTMLDivElement | null = null;
@@ -53,11 +54,12 @@ export class FloatingFrameManager {
       reactContainer.id = 'floating-frame-react-root';
       this.shadowRoot.appendChild(reactContainer);
 
-      // Mount React component
+      // Mount React component with search functionality
       this.reactRoot = createRoot(reactContainer);
       this.reactRoot.render(
         React.createElement(FloatingFrame, {
-          onClose: () => this.removeFrame()
+          onClose: () => this.removeFrame(),
+          onSearch: this.handleSearch.bind(this)
         })
       );
 
@@ -65,10 +67,25 @@ export class FloatingFrameManager {
       document.body.appendChild(this.shadowHost);
       this.isInjected = true;
 
-      console.log('Floating frame injected successfully');
+      console.log('Floating frame with search functionality injected successfully');
     } catch (error) {
       console.error('Failed to inject floating frame:', error);
       this.cleanup();
+    }
+  }
+
+  private async handleSearch(query: string): Promise<SearchResult> {
+    try {
+      console.log('Performing search for:', query);
+      const result = await searchAction(query);
+      console.log('Search result:', result);
+      return result;
+    } catch (error) {
+      console.error('Search action failed:', error);
+      return {
+        success: false,
+        message: `Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
     }
   }
 
@@ -106,7 +123,7 @@ export class FloatingFrameManager {
       }
 
       .floating-frame.expanded {
-        height: 400px;
+        height: 500px;
       }
 
       .floating-frame.collapsed {
@@ -213,6 +230,7 @@ export class FloatingFrameManager {
         font-size: 14px;
         color: #6b7280;
         line-height: 1.6;
+        margin-bottom: 16px;
       }
 
       .subsection-title {
@@ -220,6 +238,105 @@ export class FloatingFrameManager {
         font-weight: 600;
         color: #374151;
         margin-bottom: 12px;
+      }
+
+      .search-form {
+        margin-bottom: 16px;
+      }
+
+      .search-input-container {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .search-input {
+        flex: 1;
+        padding: 12px 16px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 14px;
+        background: white;
+        color: #374151;
+        transition: all 150ms ease-in-out;
+      }
+
+      .search-input:focus {
+        outline: none;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      }
+
+      .search-input:disabled {
+        background: #f9fafb;
+        color: #9ca3af;
+        cursor: not-allowed;
+      }
+
+      .search-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        background: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 150ms ease-in-out;
+      }
+
+      .search-button:hover:not(:disabled) {
+        background: #1d4ed8;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3);
+      }
+
+      .search-button:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .search-spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top: 2px solid white;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      .search-result {
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+        border: 1px solid;
+      }
+
+      .search-result.success {
+        background: rgba(16, 185, 129, 0.1);
+        border-color: rgba(16, 185, 129, 0.2);
+        color: #065f46;
+      }
+
+      .search-result.error {
+        background: rgba(239, 68, 68, 0.1);
+        border-color: rgba(239, 68, 68, 0.2);
+        color: #991b1b;
+      }
+
+      .result-message {
+        font-size: 14px;
+        font-weight: 500;
+        margin-bottom: 4px;
+      }
+
+      .result-details {
+        font-size: 12px;
+        opacity: 0.8;
       }
 
       .feature-list {
@@ -337,6 +454,16 @@ export class FloatingFrameManager {
         .primary-button,
         .secondary-button {
           min-width: unset;
+        }
+
+        .search-input-container {
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .search-button {
+          width: 100%;
+          height: 44px;
         }
       }
 
