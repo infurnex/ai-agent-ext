@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import FloatingFrame from './FloatingFrame';
 import { searchAction, SearchResult } from './actions/searchAction';
+import { fetchDOMProductsAction, FetchProductsResult } from './actions/fetchDOMProductsAction';
 
 export class FloatingFrameManager {
   private shadowHost: HTMLDivElement | null = null;
@@ -54,12 +55,13 @@ export class FloatingFrameManager {
       reactContainer.id = 'floating-frame-react-root';
       this.shadowRoot.appendChild(reactContainer);
 
-      // Mount React component with search functionality
+      // Mount React component with search and fetch products functionality
       this.reactRoot = createRoot(reactContainer);
       this.reactRoot.render(
         React.createElement(FloatingFrame, {
           onClose: () => this.removeFrame(),
-          onSearch: this.handleSearch.bind(this)
+          onSearch: this.handleSearch.bind(this),
+          onFetchProducts: this.handleFetchProducts.bind(this)
         })
       );
 
@@ -67,7 +69,7 @@ export class FloatingFrameManager {
       document.body.appendChild(this.shadowHost);
       this.isInjected = true;
 
-      console.log('Floating frame with search functionality injected successfully');
+      console.log('Floating frame with search and product extraction functionality injected successfully');
     } catch (error) {
       console.error('Failed to inject floating frame:', error);
       this.cleanup();
@@ -85,6 +87,22 @@ export class FloatingFrameManager {
       return {
         success: false,
         message: `Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
+    }
+  }
+
+  private async handleFetchProducts(): Promise<FetchProductsResult> {
+    try {
+      console.log('Fetching products from DOM...');
+      const result = await fetchDOMProductsAction();
+      console.log('Fetch products result:', result);
+      return result;
+    } catch (error) {
+      console.error('Fetch products action failed:', error);
+      return {
+        success: false,
+        message: `Failed to fetch products: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        count: 0
       };
     }
   }
@@ -109,7 +127,7 @@ export class FloatingFrameManager {
         position: fixed;
         bottom: 20px;
         left: 20px;
-        width: 300px;
+        width: 320px;
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(20px);
         border-radius: 16px;
@@ -120,10 +138,12 @@ export class FloatingFrameManager {
         pointer-events: auto;
         transition: all 200ms ease-in-out;
         overflow: hidden;
+        max-height: 80vh;
       }
 
       .floating-frame.expanded {
-        height: 500px;
+        height: auto;
+        max-height: 80vh;
       }
 
       .floating-frame.collapsed {
@@ -187,7 +207,8 @@ export class FloatingFrameManager {
 
       .floating-frame-content {
         padding: 20px;
-        height: calc(100% - 60px);
+        height: auto;
+        max-height: calc(80vh - 60px);
         overflow-y: auto;
         scrollbar-width: thin;
         scrollbar-color: rgba(107, 114, 128, 0.3) transparent;
@@ -339,6 +360,92 @@ export class FloatingFrameManager {
         opacity: 0.8;
       }
 
+      .toggle-products-button {
+        margin-top: 8px;
+        padding: 6px 12px;
+        background: #f3f4f6;
+        color: #374151;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 150ms ease-in-out;
+      }
+
+      .toggle-products-button:hover {
+        background: #e5e7eb;
+        border-color: #9ca3af;
+      }
+
+      .products-list {
+        margin-top: 16px;
+      }
+
+      .products-container {
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        background: #f9fafb;
+      }
+
+      .product-card {
+        padding: 12px;
+        border-bottom: 1px solid #e5e7eb;
+        background: white;
+        margin: 4px;
+        border-radius: 6px;
+      }
+
+      .product-card:last-child {
+        border-bottom: none;
+      }
+
+      .product-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 8px;
+        gap: 8px;
+      }
+
+      .product-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #1f2937;
+        flex: 1;
+        line-height: 1.4;
+      }
+
+      .product-price {
+        font-size: 14px;
+        font-weight: 700;
+        color: #059669;
+        white-space: nowrap;
+      }
+
+      .product-description {
+        font-size: 12px;
+        color: #6b7280;
+        line-height: 1.4;
+        margin-bottom: 8px;
+      }
+
+      .product-details {
+        font-size: 11px;
+        color: #9ca3af;
+        line-height: 1.3;
+      }
+
+      .product-details p {
+        margin-bottom: 2px;
+        word-break: break-all;
+      }
+
+      .product-details strong {
+        color: #374151;
+      }
+
       .feature-list {
         list-style: none;
         padding: 0;
@@ -380,12 +487,41 @@ export class FloatingFrameManager {
         font-size: 14px;
         cursor: pointer;
         transition: all 150ms ease-in-out;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
       }
 
-      .primary-button:hover {
+      .primary-button:hover:not(:disabled) {
         background: #1d4ed8;
         transform: translateY(-1px);
         box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3);
+      }
+
+      .primary-button:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .fetch-products-button {
+        background: #059669;
+      }
+
+      .fetch-products-button:hover:not(:disabled) {
+        background: #047857;
+        box-shadow: 0 4px 8px rgba(5, 150, 105, 0.3);
+      }
+
+      .button-spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top: 2px solid white;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
       }
 
       .secondary-button {
@@ -442,7 +578,7 @@ export class FloatingFrameManager {
       @media (max-width: 768px) {
         .floating-frame {
           width: calc(100vw - 40px);
-          max-width: 300px;
+          max-width: 320px;
           bottom: 10px;
           left: 20px;
         }
@@ -464,6 +600,11 @@ export class FloatingFrameManager {
         .search-button {
           width: 100%;
           height: 44px;
+        }
+
+        .product-header {
+          flex-direction: column;
+          align-items: flex-start;
         }
       }
 
