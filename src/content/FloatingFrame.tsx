@@ -21,19 +21,34 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch })
     setIsLoading(false);
   }, []);
 
-  // Click away listener
+  // Click away listener - only collapse when clicking outside the frame
   useEffect(() => {
     const handleClickAway = (e: MouseEvent) => {
-      if (frameRef.current && !frameRef.current.contains(e.target as Node)) {
-        setIsExpanded(false);
+      // Only collapse if clicking outside the frame AND the frame is currently expanded
+      if (frameRef.current && !frameRef.current.contains(e.target as Node) && isExpanded) {
+        // Additional check: make sure we're not clicking on the frame itself
+        const target = e.target as Element;
+        const isClickingOnFrame = target.closest('.floating-frame') === frameRef.current;
+        
+        if (!isClickingOnFrame) {
+          setIsExpanded(false);
+        }
       }
     };
 
+    // Only add listener when expanded
     if (isExpanded) {
-      document.addEventListener('mousedown', handleClickAway);
-      return () => document.removeEventListener('mousedown', handleClickAway);
+      // Use capture phase to handle the event before it bubbles
+      document.addEventListener('mousedown', handleClickAway, true);
+      return () => document.removeEventListener('mousedown', handleClickAway, true);
     }
   }, [isExpanded]);
+
+  // Prevent event bubbling for clicks inside the frame
+  const handleFrameClick = useCallback((e: React.MouseEvent) => {
+    // Stop the event from bubbling up to prevent click-away
+    e.stopPropagation();
+  }, []);
 
   // Toggle expand/collapse
   const toggleExpanded = useCallback(() => {
@@ -48,6 +63,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch })
   // Handle search
   const handleSearch = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation(); // Prevent event bubbling
     
     if (!searchQuery.trim() || !onSearch) return;
     
@@ -74,6 +90,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch })
 
   // Handle search input change
   const handleSearchInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation(); // Prevent event bubbling
     setSearchQuery(e.target.value);
     // Clear previous search result when typing
     if (searchResult) {
@@ -83,11 +100,19 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch })
 
   // Handle Enter key in search input
   const handleSearchKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    e.stopPropagation(); // Prevent event bubbling
     if (e.key === 'Enter') {
       e.preventDefault();
       handleSearch(e as any);
     }
   }, [handleSearch]);
+
+  // Handle button clicks
+  const handleButtonClick = useCallback((e: React.MouseEvent, action: () => void) => {
+    e.preventDefault();
+    e.stopPropagation(); // Prevent event bubbling
+    action();
+  }, []);
 
   if (isLoading) {
     return (
@@ -101,6 +126,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch })
     <div
       ref={frameRef}
       className={`floating-frame ${isExpanded ? 'expanded' : 'collapsed'}`}
+      onClick={handleFrameClick}
     >
       {/* Header */}
       <div className="floating-frame-header">
@@ -110,14 +136,14 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch })
         <div className="header-controls">
           <button
             className="control-button"
-            onClick={toggleExpanded}
+            onClick={(e) => handleButtonClick(e, toggleExpanded)}
             aria-label={isExpanded ? 'Minimize' : 'Maximize'}
           >
             {isExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
           </button>
           <button
             className="control-button close-button"
-            onClick={handleClose}
+            onClick={(e) => handleButtonClick(e, handleClose)}
             aria-label="Close"
           >
             <X size={16} />
@@ -152,6 +178,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch })
                   className="search-button"
                   disabled={isSearching || !searchQuery.trim()}
                   aria-label="Search"
+                  onClick={(e) => e.stopPropagation()}
                 >
                   {isSearching ? (
                     <div className="search-spinner"></div>
@@ -190,16 +217,16 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch })
             <div className="action-buttons">
               <button 
                 className="primary-button"
-                onClick={() => searchInputRef.current?.focus()}
+                onClick={(e) => handleButtonClick(e, () => searchInputRef.current?.focus())}
               >
                 Focus Search
               </button>
               <button 
                 className="secondary-button"
-                onClick={() => {
+                onClick={(e) => handleButtonClick(e, () => {
                   setSearchQuery('');
                   setSearchResult(null);
-                }}
+                })}
               >
                 Clear
               </button>
