@@ -282,27 +282,32 @@ function findAddToCartButton(element: Element): string {
     '.add-to-cart',
     '.buy-now',
     '.purchase',
-    'button:contains("Add")',
-    'button:contains("Buy")',
-    'button:contains("Cart")',
     'input[type="submit"]',
     'button[type="submit"]'
   ];
 
   for (const selector of buttonSelectors) {
-    const button = element.querySelector(selector);
-    if (button) {
-      return generateUniqueSelector(button);
+    try {
+      const button = element.querySelector(selector);
+      if (button) {
+        return generateUniqueSelector(button);
+      }
+    } catch (error) {
+      // Skip invalid selectors and continue
+      continue;
     }
   }
 
-  // Fallback: look for buttons with cart/buy related text
+  // Fallback: look for buttons with cart/buy related text content
   const allButtons = element.querySelectorAll('button, input[type="submit"], a[role="button"]');
   for (const button of allButtons) {
     const text = button.textContent?.toLowerCase() || '';
     const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
+    const title = button.getAttribute('title')?.toLowerCase() || '';
     
-    if (/add|cart|buy|purchase|order/i.test(text + ' ' + ariaLabel)) {
+    const combinedText = `${text} ${ariaLabel} ${title}`;
+    
+    if (/add.*cart|buy|purchase|order|add.*bag|add.*basket/i.test(combinedText)) {
       return generateUniqueSelector(button);
     }
   }
@@ -321,8 +326,12 @@ function generateUniqueSelector(element: Element): string {
     const classes = element.className.split(' ').filter(c => c.trim());
     if (classes.length > 0) {
       const classSelector = '.' + classes.join('.');
-      if (document.querySelectorAll(classSelector).length === 1) {
-        return classSelector;
+      try {
+        if (document.querySelectorAll(classSelector).length === 1) {
+          return classSelector;
+        }
+      } catch (error) {
+        // Skip invalid class selectors
       }
     }
   }
@@ -333,8 +342,13 @@ function generateUniqueSelector(element: Element): string {
     .map(attr => `[${attr.name}="${attr.value}"]`);
   
   for (const dataAttr of dataAttrs) {
-    if (document.querySelectorAll(dataAttr).length === 1) {
-      return dataAttr;
+    try {
+      if (document.querySelectorAll(dataAttr).length === 1) {
+        return dataAttr;
+      }
+    } catch (error) {
+      // Skip invalid data attribute selectors
+      continue;
     }
   }
 
@@ -349,7 +363,12 @@ function generateUniqueSelector(element: Element): string {
     
     selector = `${parent.tagName.toLowerCase()} > ${selector}:nth-child(${index})`;
     
-    if (document.querySelectorAll(selector).length === 1) {
+    try {
+      if (document.querySelectorAll(selector).length === 1) {
+        break;
+      }
+    } catch (error) {
+      // If selector becomes invalid, break and return what we have
       break;
     }
     
