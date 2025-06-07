@@ -21,20 +21,6 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch })
     setIsLoading(false);
   }, []);
 
-  // Click away listener
-  useEffect(() => {
-    const handleClickAway = (e: MouseEvent) => {
-      if (frameRef.current && !frameRef.current.contains(e.target as Node)) {
-        setIsExpanded(false);
-      }
-    };
-
-    if (isExpanded) {
-      document.addEventListener('mousedown', handleClickAway);
-      return () => document.removeEventListener('mousedown', handleClickAway);
-    }
-  }, [isExpanded]);
-
   // Toggle expand/collapse
   const toggleExpanded = useCallback(() => {
     setIsExpanded(prev => !prev);
