@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
-import { X, Minimize2, Maximize2, Search, Package, Layout, ShoppingCart } from 'lucide-react';
+import { X, Minimize2, Maximize2, Search, Package, Layout, ShoppingCart, CreditCard } from 'lucide-react';
 import { SearchResult } from './actions/searchAction';
 import { FetchProductsResult, Product } from './actions/fetchDOMProductsAction';
 import { FetchLayoutResult, LayoutElement } from './actions/fetchLayoutAction';
 import { BuyNowResult } from './actions/buyNowAction';
+import { CashOnDeliveryResult } from './actions/cashOnDeliveryPaymentAction';
 
 interface FloatingFrameProps {
   onClose?: () => void;
@@ -11,6 +12,7 @@ interface FloatingFrameProps {
   onFetchProducts?: () => Promise<FetchProductsResult>;
   onFetchLayout?: () => Promise<FetchLayoutResult>;
   onBuyNow?: () => Promise<BuyNowResult>;
+  onCashOnDelivery?: () => Promise<CashOnDeliveryResult>;
 }
 
 const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ 
@@ -18,7 +20,8 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   onSearch, 
   onFetchProducts, 
   onFetchLayout, 
-  onBuyNow 
+  onBuyNow,
+  onCashOnDelivery
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
@@ -33,6 +36,8 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   const [showLayout, setShowLayout] = useState(false);
   const [buyNowResult, setBuyNowResult] = useState<BuyNowResult | null>(null);
   const [isBuyingNow, setIsBuyingNow] = useState(false);
+  const [codResult, setCodResult] = useState<CashOnDeliveryResult | null>(null);
+  const [isProcessingCod, setIsProcessingCod] = useState(false);
   const frameRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -149,6 +154,30 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
     }
   }, [onBuyNow]);
 
+  // Handle cash on delivery
+  const handleCashOnDelivery = useCallback(async () => {
+    if (!onCashOnDelivery) return;
+    
+    setIsProcessingCod(true);
+    setCodResult(null);
+    
+    try {
+      const result = await onCashOnDelivery();
+      setCodResult(result);
+    } catch (error) {
+      setCodResult({
+        success: false,
+        message: 'Cash on Delivery action failed due to an error',
+        codOptionFound: false,
+        codOptionSelected: false,
+        continueButtonFound: false,
+        continueButtonClicked: false
+      });
+    } finally {
+      setIsProcessingCod(false);
+    }
+  }, [onCashOnDelivery]);
+
   // Handle search input change
   const handleSearchInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
@@ -184,10 +213,10 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
     return (
       <div key={index} className={`layout-element ${!element.isVisible ? 'element-invisible' : ''}`}>
         <span style={{ marginLeft: `${element.depth * 12}px` }}>
-          <span className="element-tag">{element.tagName}</span>
+          <span className="element-tag">&lt;{element.tagName}</span>
           {element.id && <span className="element-id"> id="{element.id}"</span>}
           {element.className && <span className="element-class"> class="{element.className.length > 30 ? element.className.substring(0, 30) + '...' : element.className}"</span>}
-          <span className="element-tag">-</span>
+          <span className="element-tag">&gt;</span>
           <span className="element-role"> [{element.semanticRole}]</span>
           {element.textContent && (
             <span className="element-text">"{element.textContent.length > 20 ? element.textContent.substring(0, 20) + '...' : element.textContent}"</span>
@@ -337,6 +366,61 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                     Selector: {buyNowResult.selector.length > 40 ? buyNowResult.selector.substring(0, 40) + '...' : buyNowResult.selector}
                   </p>
                 )}
+              </div>
+            )}
+          </div>
+
+          {/* Cash on Delivery Section */}
+          <div className="content-section">
+            <h3 className="section-title">Cash on Delivery</h3>
+            <p className="section-description">
+              Select Cash on Delivery payment method and proceed to next step on Amazon checkout.
+            </p>
+            
+            <div className="action-buttons">
+              <button 
+                className="primary-button cod-payment-button"
+                onClick={handleCashOnDelivery}
+                disabled={isProcessingCod}
+              >
+                {isProcessingCod ? (
+                  <>
+                    <div className="button-spinner"></div>
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <CreditCard size={16} />
+                    Select COD
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Cash on Delivery Result */}
+            {codResult && (
+              <div className={`search-result ${codResult.success ? 'success' : 'error'}`}>
+                <p className="result-message">{codResult.message}</p>
+                <div className="result-details">
+                  {codResult.codOptionFound !== undefined && (
+                    <p>COD Option Found: {codResult.codOptionFound ? 'Yes' : 'No'}</p>
+                  )}
+                  {codResult.codOptionSelected !== undefined && (
+                    <p>COD Option Selected: {codResult.codOptionSelected ? 'Yes' : 'No'}</p>
+                  )}
+                  {codResult.continueButtonFound !== undefined && (
+                    <p>Continue Button Found: {codResult.continueButtonFound ? 'Yes' : 'No'}</p>
+                  )}
+                  {codResult.continueButtonClicked !== undefined && (
+                    <p>Continue Button Clicked: {codResult.continueButtonClicked ? 'Yes' : 'No'}</p>
+                  )}
+                  {codResult.codSelector && (
+                    <p>COD Selector: {codResult.codSelector.length > 40 ? codResult.codSelector.substring(0, 40) + '...' : codResult.codSelector}</p>
+                  )}
+                  {codResult.continueSelector && (
+                    <p>Continue Selector: {codResult.continueSelector.length > 40 ? codResult.continueSelector.substring(0, 40) + '...' : codResult.continueSelector}</p>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -533,6 +617,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
             <ul className="feature-list">
               <li>Smart search input detection</li>
               <li>Amazon buy now button automation</li>
+              <li>Cash on delivery payment selection</li>
               <li>Product information extraction</li>
               <li>DOM layout analysis</li>
               <li>Semantic element classification</li>
@@ -559,6 +644,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                   setLayoutResult(null);
                   setShowLayout(false);
                   setBuyNowResult(null);
+                  setCodResult(null);
                 }}
               >
                 Clear All

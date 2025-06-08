@@ -5,6 +5,7 @@ import { searchAction, SearchResult } from './actions/searchAction';
 import { fetchDOMProductsAction, FetchProductsResult } from './actions/fetchDOMProductsAction';
 import { fetchLayoutAction, FetchLayoutResult } from './actions/fetchLayoutAction';
 import { buyNowAction, BuyNowResult } from './actions/buyNowAction';
+import { cashOnDeliveryPaymentAction, CashOnDeliveryResult } from './actions/cashOnDeliveryPaymentAction';
 
 export class FloatingFrameManager {
   private shadowHost: HTMLDivElement | null = null;
@@ -65,7 +66,8 @@ export class FloatingFrameManager {
           onSearch: this.handleSearch.bind(this),
           onFetchProducts: this.handleFetchProducts.bind(this),
           onFetchLayout: this.handleFetchLayout.bind(this),
-          onBuyNow: this.handleBuyNow.bind(this)
+          onBuyNow: this.handleBuyNow.bind(this),
+          onCashOnDelivery: this.handleCashOnDelivery.bind(this)
         })
       );
 
@@ -143,13 +145,31 @@ export class FloatingFrameManager {
     }
   }
 
-  private async injectStyles(): Promise<string> {
-    if (!this.shadowRoot) return '';
+  private async handleCashOnDelivery(): Promise<CashOnDeliveryResult> {
+    try {
+      console.log('Attempting to select Cash on Delivery payment method...');
+      const result = await cashOnDeliveryPaymentAction();
+      console.log('Cash on Delivery result:', result);
+      return result;
+    } catch (error) {
+      console.error('Cash on Delivery action failed:', error);
+      return {
+        success: false,
+        message: `Cash on Delivery action failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        codOptionFound: false,
+        codOptionSelected: false,
+        continueButtonFound: false,
+        continueButtonClicked: false
+      };
+    }
+  }
+
+  private async injectStyles(): Promise<void> {
+    if (!this.shadowRoot) return;
 
     const styleElement = document.createElement('style');
     styleElement.textContent = await this.getStyles();
     this.shadowRoot.appendChild(styleElement);
-    return '';
   }
 
   private async getStyles(): Promise<string> {
@@ -652,6 +672,15 @@ export class FloatingFrameManager {
       .buy-now-button:hover:not(:disabled) {
         background: #b91c1c;
         box-shadow: 0 4px 8px rgba(220, 38, 38, 0.3);
+      }
+
+      .cod-payment-button {
+        background: #f59e0b;
+      }
+
+      .cod-payment-button:hover:not(:disabled) {
+        background: #d97706;
+        box-shadow: 0 4px 8px rgba(245, 158, 11, 0.3);
       }
 
       .button-spinner {
