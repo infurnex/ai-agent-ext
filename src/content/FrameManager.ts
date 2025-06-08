@@ -6,6 +6,7 @@ import { fetchDOMProductsAction, FetchProductsResult } from './actions/fetchDOMP
 import { fetchLayoutAction, FetchLayoutResult } from './actions/fetchLayoutAction';
 import { buyNowAction, BuyNowResult } from './actions/buyNowAction';
 import { cashOnDeliveryPaymentAction, CashOnDeliveryResult } from './actions/cashOnDeliveryPaymentAction';
+import { placeYourOrderAction, PlaceOrderResult } from './actions/placeYourOrderAction';
 
 export class FloatingFrameManager {
   private shadowHost: HTMLDivElement | null = null;
@@ -67,7 +68,8 @@ export class FloatingFrameManager {
           onFetchProducts: this.handleFetchProducts.bind(this),
           onFetchLayout: this.handleFetchLayout.bind(this),
           onBuyNow: this.handleBuyNow.bind(this),
-          onCashOnDelivery: this.handleCashOnDelivery.bind(this)
+          onCashOnDelivery: this.handleCashOnDelivery.bind(this),
+          onPlaceOrder: this.handlePlaceOrder.bind(this)
         })
       );
 
@@ -160,6 +162,23 @@ export class FloatingFrameManager {
         codOptionSelected: false,
         continueButtonFound: false,
         continueButtonClicked: false
+      };
+    }
+  }
+
+  private async handlePlaceOrder(): Promise<PlaceOrderResult> {
+    try {
+      console.log('Attempting to place order...');
+      const result = await placeYourOrderAction();
+      console.log('Place order result:', result);
+      return result;
+    } catch (error) {
+      console.error('Place order action failed:', error);
+      return {
+        success: false,
+        message: `Place order action failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        buttonFound: false,
+        isOrderReviewPage: false
       };
     }
   }
@@ -681,6 +700,15 @@ export class FloatingFrameManager {
       .cod-payment-button:hover:not(:disabled) {
         background: #d97706;
         box-shadow: 0 4px 8px rgba(245, 158, 11, 0.3);
+      }
+
+      .place-order-button {
+        background: #16a34a;
+      }
+
+      .place-order-button:hover:not(:disabled) {
+        background: #15803d;
+        box-shadow: 0 4px 8px rgba(22, 163, 74, 0.3);
       }
 
       .button-spinner {

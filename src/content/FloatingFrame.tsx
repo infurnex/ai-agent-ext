@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
-import { X, Minimize2, Maximize2, Search, Package, Layout, ShoppingCart, CreditCard } from 'lucide-react';
+import { X, Minimize2, Maximize2, Search, Package, Layout, ShoppingCart, CreditCard, CheckCircle } from 'lucide-react';
 import { SearchResult } from './actions/searchAction';
 import { FetchProductsResult, Product } from './actions/fetchDOMProductsAction';
 import { FetchLayoutResult, LayoutElement } from './actions/fetchLayoutAction';
 import { BuyNowResult } from './actions/buyNowAction';
 import { CashOnDeliveryResult } from './actions/cashOnDeliveryPaymentAction';
+import { PlaceOrderResult } from './actions/placeYourOrderAction';
 
 interface FloatingFrameProps {
   onClose?: () => void;
@@ -13,6 +14,7 @@ interface FloatingFrameProps {
   onFetchLayout?: () => Promise<FetchLayoutResult>;
   onBuyNow?: () => Promise<BuyNowResult>;
   onCashOnDelivery?: () => Promise<CashOnDeliveryResult>;
+  onPlaceOrder?: () => Promise<PlaceOrderResult>;
 }
 
 const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ 
@@ -21,7 +23,8 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   onFetchProducts, 
   onFetchLayout, 
   onBuyNow,
-  onCashOnDelivery
+  onCashOnDelivery,
+  onPlaceOrder
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,6 +41,8 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   const [isBuyingNow, setIsBuyingNow] = useState(false);
   const [codResult, setCodResult] = useState<CashOnDeliveryResult | null>(null);
   const [isProcessingCod, setIsProcessingCod] = useState(false);
+  const [placeOrderResult, setPlaceOrderResult] = useState<PlaceOrderResult | null>(null);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const frameRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -178,6 +183,28 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
     }
   }, [onCashOnDelivery]);
 
+  // Handle place order
+  const handlePlaceOrder = useCallback(async () => {
+    if (!onPlaceOrder) return;
+    
+    setIsPlacingOrder(true);
+    setPlaceOrderResult(null);
+    
+    try {
+      const result = await onPlaceOrder();
+      setPlaceOrderResult(result);
+    } catch (error) {
+      setPlaceOrderResult({
+        success: false,
+        message: 'Place order action failed due to an error',
+        buttonFound: false,
+        isOrderReviewPage: false
+      });
+    } finally {
+      setIsPlacingOrder(false);
+    }
+  }, [onPlaceOrder]);
+
   // Handle search input change
   const handleSearchInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
@@ -213,10 +240,10 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
     return (
       <div key={index} className={`layout-element ${!element.isVisible ? 'element-invisible' : ''}`}>
         <span style={{ marginLeft: `${element.depth * 12}px` }}>
-          <span className="element-tag">&lt;{element.tagName}</span>
+          <span className="element-tag"><{element.tagName}</span>
           {element.id && <span className="element-id"> id="{element.id}"</span>}
           {element.className && <span className="element-class"> class="{element.className.length > 30 ? element.className.substring(0, 30) + '...' : element.className}"</span>}
-          <span className="element-tag">&gt;</span>
+          <span className="element-tag">></span>
           <span className="element-role"> [{element.semanticRole}]</span>
           {element.textContent && (
             <span className="element-text">"{element.textContent.length > 20 ? element.textContent.substring(0, 20) + '...' : element.textContent}"</span>
@@ -425,6 +452,55 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
             )}
           </div>
 
+          {/* Place Your Order Section */}
+          <div className="content-section">
+            <h3 className="section-title">Place Your Order</h3>
+            <p className="section-description">
+              ⚠️ <strong>FINAL STEP:</strong> Click "Place Your Order" to complete your Amazon purchase. This will charge your payment method.
+            </p>
+            
+            <div className="action-buttons">
+              <button 
+                className="primary-button place-order-button"
+                onClick={handlePlaceOrder}
+                disabled={isPlacingOrder}
+              >
+                {isPlacingOrder ? (
+                  <>
+                    <div className="button-spinner"></div>
+                    Placing Order...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={16} />
+                    Place Order
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Place Order Result */}
+            {placeOrderResult && (
+              <div className={`search-result ${placeOrderResult.success ? 'success' : 'error'}`}>
+                <p className="result-message">{placeOrderResult.message}</p>
+                <div className="result-details">
+                  {placeOrderResult.buttonFound !== undefined && (
+                    <p>Place Order Button Found: {placeOrderResult.buttonFound ? 'Yes' : 'No'}</p>
+                  )}
+                  {placeOrderResult.isOrderReviewPage !== undefined && (
+                    <p>On Order Review Page: {placeOrderResult.isOrderReviewPage ? 'Yes' : 'No'}</p>
+                  )}
+                  {placeOrderResult.buttonText && (
+                    <p>Button Text: "{placeOrderResult.buttonText}"</p>
+                  )}
+                  {placeOrderResult.selector && (
+                    <p>Selector: {placeOrderResult.selector.length > 40 ? placeOrderResult.selector.substring(0, 40) + '...' : placeOrderResult.selector}</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Fetch Products Section */}
           <div className="content-section">
             <h3 className="section-title">Extract Products</h3>
@@ -618,6 +694,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
               <li>Smart search input detection</li>
               <li>Amazon buy now button automation</li>
               <li>Cash on delivery payment selection</li>
+              <li>Complete order placement</li>
               <li>Product information extraction</li>
               <li>DOM layout analysis</li>
               <li>Semantic element classification</li>
@@ -645,6 +722,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                   setShowLayout(false);
                   setBuyNowResult(null);
                   setCodResult(null);
+                  setPlaceOrderResult(null);
                 }}
               >
                 Clear All
