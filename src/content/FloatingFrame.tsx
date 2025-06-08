@@ -187,7 +187,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
           <span className="element-tag">{element.tagName}</span>
           {element.id && <span className="element-id"> id="{element.id}"</span>}
           {element.className && <span className="element-class"> class="{element.className.length > 30 ? element.className.substring(0, 30) + '...' : element.className}"</span>}
-          <span className="element-tag">></span>
+          <span className="element-tag">-</span>
           <span className="element-role"> [{element.semanticRole}]</span>
           {element.textContent && (
             <span className="element-text">"{element.textContent.length > 20 ? element.textContent.substring(0, 20) + '...' : element.textContent}"</span>
