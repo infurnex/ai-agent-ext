@@ -9,10 +9,13 @@ export default defineConfig({
     rollupOptions: {
       input: {
         content: resolve(__dirname, 'src/content/content.ts'),
+        background: resolve(__dirname, 'src/background.ts'),
       },
       output: {
         entryFileNames: (chunkInfo) => {
-          return chunkInfo.name === 'content' ? 'src/content/[name].js' : '[name]-[hash].js';
+          if (chunkInfo.name === 'content') return 'src/content/[name].js';
+          if (chunkInfo.name === 'background') return 'src/[name].js';
+          return '[name]-[hash].js';
         },
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: (assetInfo) => {

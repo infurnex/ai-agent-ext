@@ -666,6 +666,15 @@ export class FloatingFrameManager {
         box-shadow: none;
       }
 
+      .append-queue-button {
+        background: #8b5cf6;
+      }
+
+      .append-queue-button:hover:not(:disabled) {
+        background: #7c3aed;
+        box-shadow: 0 4px 8px rgba(139, 92, 246, 0.3);
+      }
+
       .fetch-products-button {
         background: #059669;
       }

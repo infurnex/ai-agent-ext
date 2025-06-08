@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
-import { X, Minimize2, Maximize2, Search, Package, Layout, ShoppingCart, CreditCard, CheckCircle } from 'lucide-react';
+import { X, Minimize2, Maximize2, Search, Package, Layout, ShoppingCart, CreditCard, CheckCircle, Plus } from 'lucide-react';
 import { SearchResult } from './actions/searchAction';
 import { FetchProductsResult, Product } from './actions/fetchDOMProductsAction';
 import { FetchLayoutResult, LayoutElement } from './actions/fetchLayoutAction';
@@ -43,6 +43,8 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   const [isProcessingCod, setIsProcessingCod] = useState(false);
   const [placeOrderResult, setPlaceOrderResult] = useState<PlaceOrderResult | null>(null);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [queueResult, setQueueResult] = useState<string | null>(null);
+  const [isAppendingQueue, setIsAppendingQueue] = useState(false);
   const frameRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -60,6 +62,35 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   const handleClose = useCallback(() => {
     onClose?.();
   }, [onClose]);
+
+  // Handle append queue
+  const handleAppendQueue = useCallback(async () => {
+    setIsAppendingQueue(true);
+    setQueueResult(null);
+    
+    try {
+      const queue = ["buy_now", "cash_on_delivery"];
+      
+      for (const action of queue) {
+        const response = await new Promise<{success: boolean, queueLength: number}>((resolve) => {
+          chrome.runtime.sendMessage({
+            type: 'APPEND_ACTION',
+            action: action
+          }, resolve);
+        });
+        
+        if (!response.success) {
+          throw new Error(`Failed to append action: ${action}`);
+        }
+      }
+      
+      setQueueResult(`Successfully added ${queue.length} actions to queue: ${queue.join(', ')}`);
+    } catch (error) {
+      setQueueResult(`Failed to append queue: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsAppendingQueue(false);
+    }
+  }, []);
 
   // Handle search
   const handleSearch = useCallback(async (e: React.FormEvent) => {
@@ -300,6 +331,41 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
       {/* Content */}
       {isExpanded && (
         <div className="floating-frame-content">
+          {/* Action Queue Section */}
+          <div className="content-section">
+            <h3 className="section-title">Action Queue</h3>
+            <p className="section-description">
+              Add predefined actions to the background action queue.
+            </p>
+            
+            <div className="action-buttons">
+              <button 
+                className="primary-button append-queue-button"
+                onClick={handleAppendQueue}
+                disabled={isAppendingQueue}
+              >
+                {isAppendingQueue ? (
+                  <>
+                    <div className="button-spinner"></div>
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <Plus size={16} />
+                    Add Queue
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Queue Result */}
+            {queueResult && (
+              <div className={`search-result ${queueResult.includes('Successfully') ? 'success' : 'error'}`}>
+                <p className="result-message">{queueResult}</p>
+              </div>
+            )}
+          </div>
+
           {/* Search Section */}
           <div className="content-section">
             <h3 className="section-title">Search Products</h3>
@@ -691,6 +757,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
           <div className="content-section">
             <h4 className="subsection-title">Features</h4>
             <ul className="feature-list">
+              <li>Action queue management</li>
               <li>Smart search input detection</li>
               <li>Amazon buy now button automation</li>
               <li>Cash on delivery payment selection</li>
@@ -723,6 +790,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                   setBuyNowResult(null);
                   setCodResult(null);
                   setPlaceOrderResult(null);
+                  setQueueResult(null);
                 }}
               >
                 Clear All
