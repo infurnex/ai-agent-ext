@@ -4,6 +4,7 @@ import FloatingFrame from './FloatingFrame';
 import { searchAction, SearchResult } from './actions/searchAction';
 import { fetchDOMProductsAction, FetchProductsResult } from './actions/fetchDOMProductsAction';
 import { fetchLayoutAction, FetchLayoutResult } from './actions/fetchLayoutAction';
+import { buyNowAction, BuyNowResult } from './actions/buyNowAction';
 
 export class FloatingFrameManager {
   private shadowHost: HTMLDivElement | null = null;
@@ -63,7 +64,8 @@ export class FloatingFrameManager {
           onClose: () => this.removeFrame(),
           onSearch: this.handleSearch.bind(this),
           onFetchProducts: this.handleFetchProducts.bind(this),
-          onFetchLayout: this.handleFetchLayout.bind(this)
+          onFetchLayout: this.handleFetchLayout.bind(this),
+          onBuyNow: this.handleBuyNow.bind(this)
         })
       );
 
@@ -125,12 +127,29 @@ export class FloatingFrameManager {
     }
   }
 
-  private async injectStyles(): Promise<void> {
-    if (!this.shadowRoot) return;
+  private async handleBuyNow(): Promise<BuyNowResult> {
+    try {
+      console.log('Attempting to find and click buy now button...');
+      const result = await buyNowAction();
+      console.log('Buy now result:', result);
+      return result;
+    } catch (error) {
+      console.error('Buy now action failed:', error);
+      return {
+        success: false,
+        message: `Buy now action failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        buttonFound: false
+      };
+    }
+  }
+
+  private async injectStyles(): Promise<string> {
+    if (!this.shadowRoot) return '';
 
     const styleElement = document.createElement('style');
     styleElement.textContent = await this.getStyles();
     this.shadowRoot.appendChild(styleElement);
+    return '';
   }
 
   private async getStyles(): Promise<string> {
@@ -624,6 +643,15 @@ export class FloatingFrameManager {
       .fetch-layout-button:hover:not(:disabled) {
         background: #6d28d9;
         box-shadow: 0 4px 8px rgba(124, 58, 237, 0.3);
+      }
+
+      .buy-now-button {
+        background: #dc2626;
+      }
+
+      .buy-now-button:hover:not(:disabled) {
+        background: #b91c1c;
+        box-shadow: 0 4px 8px rgba(220, 38, 38, 0.3);
       }
 
       .button-spinner {

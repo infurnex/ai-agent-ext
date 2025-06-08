@@ -1,17 +1,25 @@
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
-import { X, Minimize2, Maximize2, Search, Package, Layout } from 'lucide-react';
+import { X, Minimize2, Maximize2, Search, Package, Layout, ShoppingCart } from 'lucide-react';
 import { SearchResult } from './actions/searchAction';
 import { FetchProductsResult, Product } from './actions/fetchDOMProductsAction';
 import { FetchLayoutResult, LayoutElement } from './actions/fetchLayoutAction';
+import { BuyNowResult } from './actions/buyNowAction';
 
 interface FloatingFrameProps {
   onClose?: () => void;
   onSearch?: (query: string) => Promise<SearchResult>;
   onFetchProducts?: () => Promise<FetchProductsResult>;
   onFetchLayout?: () => Promise<FetchLayoutResult>;
+  onBuyNow?: () => Promise<BuyNowResult>;
 }
 
-const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch, onFetchProducts, onFetchLayout }) => {
+const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ 
+  onClose, 
+  onSearch, 
+  onFetchProducts, 
+  onFetchLayout, 
+  onBuyNow 
+}) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -23,6 +31,8 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch, o
   const [layoutResult, setLayoutResult] = useState<FetchLayoutResult | null>(null);
   const [isFetchingLayout, setIsFetchingLayout] = useState(false);
   const [showLayout, setShowLayout] = useState(false);
+  const [buyNowResult, setBuyNowResult] = useState<BuyNowResult | null>(null);
+  const [isBuyingNow, setIsBuyingNow] = useState(false);
   const frameRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -118,6 +128,27 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch, o
     }
   }, [onFetchLayout]);
 
+  // Handle buy now
+  const handleBuyNow = useCallback(async () => {
+    if (!onBuyNow) return;
+    
+    setIsBuyingNow(true);
+    setBuyNowResult(null);
+    
+    try {
+      const result = await onBuyNow();
+      setBuyNowResult(result);
+    } catch (error) {
+      setBuyNowResult({
+        success: false,
+        message: 'Buy now action failed due to an error',
+        buttonFound: false
+      });
+    } finally {
+      setIsBuyingNow(false);
+    }
+  }, [onBuyNow]);
+
   // Handle search input change
   const handleSearchInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
@@ -153,10 +184,10 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch, o
     return (
       <div key={index} className={`layout-element ${!element.isVisible ? 'element-invisible' : ''}`}>
         <span style={{ marginLeft: `${element.depth * 12}px` }}>
-          <span className="element-tag">&lt;{element.tagName}</span>
+          <span className="element-tag"><{element.tagName}</span>
           {element.id && <span className="element-id"> id="{element.id}"</span>}
           {element.className && <span className="element-class"> class="{element.className.length > 30 ? element.className.substring(0, 30) + '...' : element.className}"</span>}
-          <span className="element-tag">&gt;</span>
+          <span className="element-tag">></span>
           <span className="element-role"> [{element.semanticRole}]</span>
           {element.textContent && (
             <span className="element-text">"{element.textContent.length > 20 ? element.textContent.substring(0, 20) + '...' : element.textContent}"</span>
@@ -254,6 +285,56 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch, o
                 {searchResult.elementsFound !== undefined && (
                   <p className="result-details">
                     Elements found: {searchResult.elementsFound}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Buy Now Section */}
+          <div className="content-section">
+            <h3 className="section-title">Amazon Buy Now</h3>
+            <p className="section-description">
+              Automatically find and click the "Buy Now" button on Amazon product pages.
+            </p>
+            
+            <div className="action-buttons">
+              <button 
+                className="primary-button buy-now-button"
+                onClick={handleBuyNow}
+                disabled={isBuyingNow}
+              >
+                {isBuyingNow ? (
+                  <>
+                    <div className="button-spinner"></div>
+                    Clicking...
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart size={16} />
+                    Buy Now
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Buy Now Result */}
+            {buyNowResult && (
+              <div className={`search-result ${buyNowResult.success ? 'success' : 'error'}`}>
+                <p className="result-message">{buyNowResult.message}</p>
+                {buyNowResult.buttonFound !== undefined && (
+                  <p className="result-details">
+                    Button found: {buyNowResult.buttonFound ? 'Yes' : 'No'}
+                  </p>
+                )}
+                {buyNowResult.buttonText && (
+                  <p className="result-details">
+                    Button text: "{buyNowResult.buttonText}"
+                  </p>
+                )}
+                {buyNowResult.selector && (
+                  <p className="result-details">
+                    Selector: {buyNowResult.selector.length > 40 ? buyNowResult.selector.substring(0, 40) + '...' : buyNowResult.selector}
                   </p>
                 )}
               </div>
@@ -451,6 +532,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch, o
             <h4 className="subsection-title">Features</h4>
             <ul className="feature-list">
               <li>Smart search input detection</li>
+              <li>Amazon buy now button automation</li>
               <li>Product information extraction</li>
               <li>DOM layout analysis</li>
               <li>Semantic element classification</li>
@@ -476,6 +558,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose, onSearch, o
                   setShowProducts(false);
                   setLayoutResult(null);
                   setShowLayout(false);
+                  setBuyNowResult(null);
                 }}
               >
                 Clear All
