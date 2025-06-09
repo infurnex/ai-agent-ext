@@ -68,6 +68,37 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://hmwchcxvaweffi
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhtd2NoY3h2YXdlZmZpanpzdGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0NTg0ODAsImV4cCI6MjA2NTAzNDQ4MH0.LiC_-lMYV6erflw8bRqBystXhklMG8PpCOgthiFQ-Qk';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Helper function to check if extension context is valid
+function isExtensionContextValid(): boolean {
+  try {
+    return !!(chrome && chrome.runtime && chrome.runtime.id);
+  } catch (error) {
+    return false;
+  }
+}
+
+// Helper function to send message with error handling
+async function sendMessageSafely(message: any): Promise<any> {
+  return new Promise((resolve, reject) => {
+    if (!isExtensionContextValid()) {
+      reject(new Error('Extension context invalidated'));
+      return;
+    }
+
+    try {
+      chrome.runtime.sendMessage(message, (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        resolve(response);
+      });
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
 const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ 
   onClose, 
   onSearch, 
@@ -334,7 +365,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
     }));
   }, []);
 
-  // Handle checkout
+  // Handle checkout with improved error handling
   const handleCheckout = useCallback(async () => {
     const selectedActions: string[] = [];
     
@@ -347,25 +378,38 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
       return;
     }
 
+    // Check if extension context is valid before proceeding
+    if (!isExtensionContextValid()) {
+      alert('Extension context is invalid. Please refresh the page and try again.');
+      return;
+    }
+
     setIsCheckingOut(true);
 
     try {
-      // Send actions to background script
+      // Send actions to background script with error handling
       for (const action of selectedActions) {
-        await new Promise<void>((resolve, reject) => {
-          chrome.runtime.sendMessage({
+        try {
+          const response = await sendMessageSafely({
             type: 'APPEND_ACTION',
             action: action
-          }, (response) => {
-            if (response?.success) {
-              console.log(`Action ${action} added to queue`);
-              resolve();
-            } else {
-              console.error(`Failed to add action ${action}:`, response?.error);
-              reject(new Error(response?.error || 'Unknown error'));
-            }
           });
-        });
+
+          if (response?.success) {
+            console.log(`Action ${action} added to queue`);
+          } else {
+            throw new Error(response?.error || 'Unknown error');
+          }
+        } catch (error) {
+          console.error(`Failed to add action ${action}:`, error);
+          
+          if (error instanceof Error && error.message.includes('Extension context invalidated')) {
+            alert('Extension context was invalidated. Please refresh the page and try again.');
+            return;
+          }
+          
+          throw error;
+        }
       }
 
       alert(`Successfully queued ${selectedActions.length} action(s) for automation:\n${selectedActions.join(', ')}`);
@@ -379,7 +423,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
 
     } catch (error) {
       console.error('Checkout failed:', error);
-      alert('Failed to queue actions. Please try again.');
+      alert('Failed to queue actions. Please try again or refresh the page if the issue persists.');
     } finally {
       setIsCheckingOut(false);
     }
