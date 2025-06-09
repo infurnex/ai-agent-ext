@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
-import { X, Minimize2, Maximize2, MessageCircle, Settings, Send, Image, Star, ExternalLink } from 'lucide-react';
+import { X, Minimize2, Maximize2, MessageCircle, Settings, Send, Image, Star, ExternalLink, Eye } from 'lucide-react';
 import { SearchResult } from './actions/searchAction';
 import { FetchProductsResult, Product } from './actions/fetchDOMProductsAction';
 import { FetchLayoutResult, LayoutElement } from './actions/fetchLayoutAction';
@@ -297,6 +297,17 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                                   )}
                                   <div className="product-reason">
                                     <strong>Why this product:</strong> {product.reason}
+                                  </div>
+                                  <div className="product-actions">
+                                    <a 
+                                      href={product.link} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="view-product-button"
+                                    >
+                                      <Eye size={16} />
+                                      View Product
+                                    </a>
                                   </div>
                                 </div>
                               </div>

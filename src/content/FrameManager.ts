@@ -516,6 +516,32 @@ export class FloatingFrameManager {
         border-left: 3px solid #2563eb;
       }
 
+      .product-actions {
+        margin-top: 8px;
+        display: flex;
+        justify-content: center;
+      }
+
+      .view-product-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        background: #2563eb;
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: 500;
+        font-size: 12px;
+        transition: all 150ms ease-in-out;
+      }
+
+      .view-product-button:hover {
+        background: #1d4ed8;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3);
+      }
+
       .take-me-there {
         margin-top: 16px;
         text-align: center;
