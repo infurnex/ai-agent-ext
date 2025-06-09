@@ -63,10 +63,18 @@ interface ImageUpload {
   uploading: boolean;
 }
 
-// Initialize Supabase client
+// Initialize Supabase client with fallback values
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://hmwchcxvaweffijzstls.supabase.co';
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhtd2NoY3h2YXdlZmZpanpzdGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0NTg0ODAsImV4cCI6MjA2NTAzNDQ4MH0.LiC_-lMYV6erflw8bRqBystXhklMG8PpCOgthiFQ-Qk';
-const supabase = createClient(supabaseUrl, supabaseKey);
+
+let supabase: any = null;
+
+// Initialize Supabase with error handling
+try {
+  supabase = createClient(supabaseUrl, supabaseKey);
+} catch (error) {
+  console.error('Failed to initialize Supabase:', error);
+}
 
 const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ 
   onClose, 
@@ -115,6 +123,13 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   useEffect(() => {
     const initializeAuth = async () => {
       try {
+        // Set loading to false immediately if Supabase is not available
+        if (!supabase) {
+          console.warn('Supabase not available, running in offline mode');
+          setIsLoading(false);
+          return;
+        }
+
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
           setUser({
@@ -126,6 +141,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
+        // Don't let auth errors prevent the component from loading
       } finally {
         setIsLoading(false);
       }
@@ -133,26 +149,30 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
 
     initializeAuth();
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        setUser({
-          id: session.user.id,
-          email: session.user.email || ''
-        });
-        setAuthError('');
-        await loadChatMessages(session.user.id);
-      } else {
-        setUser(null);
-        setMessages([]);
-      }
-    });
+    // Listen for auth changes only if Supabase is available
+    if (supabase) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (session?.user) {
+          setUser({
+            id: session.user.id,
+            email: session.user.email || ''
+          });
+          setAuthError('');
+          await loadChatMessages(session.user.id);
+        } else {
+          setUser(null);
+          setMessages([]);
+        }
+      });
 
-    return () => subscription.unsubscribe();
+      return () => subscription.unsubscribe();
+    }
   }, []);
 
   // Load chat messages from Supabase
   const loadChatMessages = async (userId: string) => {
+    if (!supabase) return;
+    
     setIsLoadingMessages(true);
     try {
       const { data, error } = await supabase
@@ -199,6 +219,8 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
 
   // Save message to Supabase
   const saveMessageToSupabase = async (message: ChatMessage, userId: string) => {
+    if (!supabase) return;
+    
     try {
       const { error } = await supabase
         .from('chat_messages')
@@ -223,6 +245,8 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
 
   // Upload image to Supabase Storage
   const uploadImageToSupabase = async (file: File): Promise<string | null> => {
+    if (!supabase) return null;
+    
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
@@ -281,6 +305,11 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
 
   // Handle login
   const handleLogin = useCallback(async () => {
+    if (!supabase) {
+      setAuthError('Authentication service not available');
+      return;
+    }
+
     if (!loginForm.email || !loginForm.password) {
       setAuthError('Please enter both email and password');
       return;
@@ -315,6 +344,8 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
 
   // Handle logout
   const handleLogout = useCallback(async () => {
+    if (!supabase) return;
+    
     try {
       await supabase.auth.signOut();
       setUser(null);
@@ -569,6 +600,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
     }
   }, [handleSendMessage, handleLogin, user]);
 
+  // Show loading spinner only briefly during initialization
   if (isLoading) {
     return (
       <div className="floating-frame-loading">

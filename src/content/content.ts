@@ -3,18 +3,43 @@ import { buyNowAction } from "./actions/buyNowAction";
 import { cashOnDeliveryPaymentAction } from "./actions/cashOnDeliveryPaymentAction";
 import { placeYourOrderAction } from "./actions/placeYourOrderAction";
 
-// Initialize the floating frame manager
-if (typeof window !== 'undefined') {
+// Check if current URL is Amazon
+function isAmazonURL(): boolean {
+  const hostname = window.location.hostname.toLowerCase();
+  return hostname.includes('amazon.') || 
+         hostname.includes('amazon.com') || 
+         hostname.includes('amazon.in') ||
+         hostname.includes('amazon.co.uk') ||
+         hostname.includes('amazon.de') ||
+         hostname.includes('amazon.fr') ||
+         hostname.includes('amazon.it') ||
+         hostname.includes('amazon.es') ||
+         hostname.includes('amazon.ca') ||
+         hostname.includes('amazon.com.au') ||
+         hostname.includes('amazon.co.jp');
+}
+
+// Initialize the floating frame manager only on Amazon URLs
+if (typeof window !== 'undefined' && isAmazonURL()) {
   // Ensure we only inject once per page
   if (!window.floatingFrameManager) {
+    console.log('Initializing floating frame on Amazon URL:', window.location.href);
     window.floatingFrameManager = new FloatingFrameManager();
   }
+} else {
+  console.log('Floating frame not initialized - not on Amazon URL:', window.location.href);
 }
 
 // Action execution loop
 async function executeActionLoop() {
   while (true) {
     try {
+      // Only execute actions if we're on Amazon
+      if (!isAmazonURL()) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        continue;
+      }
+
       // Fetch action from background
       const response = await new Promise<{success: boolean, action: string | null, queueLength: number}>((resolve) => {
         chrome.runtime.sendMessage({
@@ -54,8 +79,10 @@ async function executeActionLoop() {
   }
 }
 
-// Start action execution loop
-executeActionLoop();
+// Start action execution loop only on Amazon
+if (isAmazonURL()) {
+  executeActionLoop();
+}
 
 // Make it available globally for debugging
 declare global {
