@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
-import { X, Minimize2, Maximize2, MessageCircle, ShoppingCart, Send, Image, Star, ExternalLink, Eye, CreditCard, Package, CheckCircle, LogIn, User } from 'lucide-react';
+import { X, Minimize2, Maximize2, MessageCircle, ShoppingCart, Send, Image, Star, ExternalLink, Eye, CreditCard, Package, CheckCircle, LogIn, User, Upload, FileImage, Trash2 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 import { SearchResult } from './actions/searchAction';
 import { FetchProductsResult, Product } from './actions/fetchDOMProductsAction';
@@ -48,11 +48,19 @@ interface ChatMessage {
       reason: string;
     }>;
   };
+  imageUrl?: string;
+  imageName?: string;
 }
 
 interface User {
   id: string;
   email: string;
+}
+
+interface ImageUpload {
+  file: File;
+  preview: string;
+  uploading: boolean;
 }
 
 // Initialize Supabase client
@@ -76,6 +84,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   
   // Authentication state
   const [user, setUser] = useState<User | null>(null);
@@ -85,6 +94,10 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
     password: ''
   });
   const [authError, setAuthError] = useState<string>('');
+  
+  // Image upload state
+  const [imageUpload, setImageUpload] = useState<ImageUpload | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
   
   // Checkout options state
   const [checkoutOptions, setCheckoutOptions] = useState({
@@ -96,6 +109,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   const frameRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragCounterRef = useRef(0);
 
   // Initialize component and check auth
   useEffect(() => {
@@ -107,13 +121,8 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
             id: session.user.id,
             email: session.user.email || ''
           });
-          // Add welcome message for authenticated users
-          setMessages([{
-            id: '1',
-            type: 'assistant',
-            content: `Welcome back! I'm your AI shopping assistant. I can help you find products, compare prices, and assist with your shopping needs. How can I help you today?`,
-            timestamp: new Date()
-          }]);
+          // Load chat messages for authenticated user
+          await loadChatMessages(session.user.id);
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
@@ -125,13 +134,14 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
     initializeAuth();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         setUser({
           id: session.user.id,
           email: session.user.email || ''
         });
         setAuthError('');
+        await loadChatMessages(session.user.id);
       } else {
         setUser(null);
         setMessages([]);
@@ -140,6 +150,103 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Load chat messages from Supabase
+  const loadChatMessages = async (userId: string) => {
+    setIsLoadingMessages(true);
+    try {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error loading messages:', error);
+        return;
+      }
+
+      const loadedMessages: ChatMessage[] = data.map(msg => ({
+        id: msg.id,
+        type: msg.type,
+        content: msg.content,
+        timestamp: new Date(msg.created_at),
+        hasProducts: msg.has_products,
+        products: msg.products_data,
+        imageUrl: msg.image_url,
+        imageName: msg.image_name
+      }));
+
+      setMessages(loadedMessages);
+
+      // Add welcome message if no messages exist
+      if (loadedMessages.length === 0) {
+        const welcomeMessage: ChatMessage = {
+          id: 'welcome',
+          type: 'assistant',
+          content: `Welcome back! I'm your AI shopping assistant. I can help you find products, compare prices, and assist with your shopping needs. How can I help you today?`,
+          timestamp: new Date()
+        };
+        setMessages([welcomeMessage]);
+        await saveMessageToSupabase(welcomeMessage, userId);
+      }
+    } catch (error) {
+      console.error('Failed to load messages:', error);
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  };
+
+  // Save message to Supabase
+  const saveMessageToSupabase = async (message: ChatMessage, userId: string) => {
+    try {
+      const { error } = await supabase
+        .from('chat_messages')
+        .insert({
+          id: message.id,
+          user_id: userId,
+          type: message.type,
+          content: message.content,
+          has_products: message.hasProducts || false,
+          products_data: message.products || null,
+          image_url: message.imageUrl || null,
+          image_name: message.imageName || null
+        });
+
+      if (error) {
+        console.error('Error saving message:', error);
+      }
+    } catch (error) {
+      console.error('Failed to save message:', error);
+    }
+  };
+
+  // Upload image to Supabase Storage
+  const uploadImageToSupabase = async (file: File): Promise<string | null> => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `chat-images/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('chat-images')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        return null;
+      }
+
+      const { data } = supabase.storage
+        .from('chat-images')
+        .getPublicUrl(filePath);
+
+      return data.publicUrl;
+    } catch (error) {
+      console.error('Failed to upload image:', error);
+      return null;
+    }
+  };
 
   // Auto-scroll chat to bottom
   useEffect(() => {
@@ -196,13 +303,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
           email: data.user.email || ''
         });
         setLoginForm({ email: '', password: '' });
-        // Add welcome message
-        setMessages([{
-          id: '1',
-          type: 'assistant',
-          content: `Welcome back, ${data.user.email}! I'm your AI shopping assistant. I can help you find products, compare prices, and assist with your shopping needs. How can I help you today?`,
-          timestamp: new Date()
-        }]);
+        await loadChatMessages(data.user.id);
       }
     } catch (error) {
       setAuthError('Login failed. Please try again.');
@@ -219,6 +320,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
       setUser(null);
       setMessages([]);
       setLoginForm({ email: '', password: '' });
+      setImageUpload(null);
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -285,25 +387,49 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
 
   // Handle send message
   const handleSendMessage = useCallback(async () => {
-    if (!inputMessage.trim()) return;
+    if (!inputMessage.trim() && !imageUpload) return;
+    if (!user) return;
+
+    let imageUrl: string | null = null;
+    let imageName: string | null = null;
+
+    // Upload image if present
+    if (imageUpload) {
+      setImageUpload(prev => prev ? { ...prev, uploading: true } : null);
+      imageUrl = await uploadImageToSupabase(imageUpload.file);
+      imageName = imageUpload.file.name;
+      
+      if (!imageUrl) {
+        alert('Failed to upload image. Please try again.');
+        setImageUpload(prev => prev ? { ...prev, uploading: false } : null);
+        return;
+      }
+    }
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       type: 'user',
-      content: inputMessage,
-      timestamp: new Date()
+      content: inputMessage.trim() || (imageUpload ? `[Image: ${imageUpload.file.name}]` : ''),
+      timestamp: new Date(),
+      imageUrl,
+      imageName
     };
 
     setMessages(prev => [...prev, userMessage]);
+    await saveMessageToSupabase(userMessage, user.id);
+    
     setInputMessage('');
+    setImageUpload(null);
     setIsTyping(true);
 
     // Simulate AI response (replace with actual API call)
-    setTimeout(() => {
+    setTimeout(async () => {
       const mockResponse = {
-        response: "I found some great laptops for you! Here are my top recommendations based on your requirements.",
-        hasProducts: true,
-        products: {
+        response: imageUrl 
+          ? "I can see the image you've shared! Based on what I can observe, I can help you find similar products or provide recommendations. What specific information are you looking for?"
+          : "I found some great laptops for you! Here are my top recommendations based on your requirements.",
+        hasProducts: !imageUrl,
+        products: !imageUrl ? {
           takeMeThere: "https://amazon.in/s?k=laptops",
           selectedProducts: [
             {
@@ -328,7 +454,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
               reason: "This MSI Thin15 laptop is selected due to its high rating (4.5), competitive price (₹72,799), and features like Intel Core i7-12650H processor and NVIDIA GeForce RTX3050 graphics, aligning with the customer's preference for high-rated, cost-effective gaming laptops from reputed brands."
             }
           ]
-        }
+        } : undefined
       };
 
       const assistantMessage: ChatMessage = {
@@ -341,9 +467,10 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+      await saveMessageToSupabase(assistantMessage, user.id);
       setIsTyping(false);
     }, 2000);
-  }, [inputMessage]);
+  }, [inputMessage, imageUpload, user]);
 
   // Handle image upload
   const handleImageUpload = useCallback(() => {
@@ -354,18 +481,80 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file && file.type.startsWith('image/')) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        alert('Image size must be less than 5MB');
+        return;
+      }
+
       const reader = new FileReader();
       reader.onload = (e) => {
-        const imageMessage: ChatMessage = {
-          id: Date.now().toString(),
-          type: 'user',
-          content: `[Image uploaded: ${file.name}]`,
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, imageMessage]);
+        setImageUpload({
+          file,
+          preview: e.target?.result as string,
+          uploading: false
+        });
       };
       reader.readAsDataURL(file);
+    } else {
+      alert('Please select a valid image file');
     }
+    
+    // Reset input
+    event.target.value = '';
+  }, []);
+
+  // Handle drag and drop
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragOver(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    dragCounterRef.current = 0;
+
+    const files = Array.from(e.dataTransfer.files);
+    const imageFile = files.find(file => file.type.startsWith('image/'));
+    
+    if (imageFile) {
+      if (imageFile.size > 5 * 1024 * 1024) {
+        alert('Image size must be less than 5MB');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setImageUpload({
+          file: imageFile,
+          preview: event.target?.result as string,
+          uploading: false
+        });
+      };
+      reader.readAsDataURL(imageFile);
+    }
+  }, []);
+
+  // Remove image upload
+  const removeImageUpload = useCallback(() => {
+    setImageUpload(null);
   }, []);
 
   // Handle key press
@@ -523,14 +712,48 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
               {/* Tab Content */}
               <div className="tab-content">
                 {activeTab === 'chat' && (
-                  <div className="chat-container">
+                  <div 
+                    className={`chat-container ${isDragOver ? 'drag-over' : ''}`}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                    onDragOver={handleDragOver}
+                    onDrop={handleDrop}
+                  >
+                    {/* Drag Overlay */}
+                    {isDragOver && (
+                      <div className="drag-overlay">
+                        <div className="drag-content">
+                          <Upload size={48} />
+                          <p>Drop image here to upload</p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Chat Messages */}
                     <div className="chat-messages" ref={chatContainerRef}>
+                      {isLoadingMessages && (
+                        <div className="loading-messages">
+                          <div className="loading-spinner"></div>
+                          <span>Loading messages...</span>
+                        </div>
+                      )}
+
                       {messages.map((message) => (
                         <div key={message.id} className={`message ${message.type}`}>
                           <div className="message-content">
                             {message.content}
                           </div>
+                          
+                          {/* Image Display */}
+                          {message.imageUrl && (
+                            <div className="message-image">
+                              <img src={message.imageUrl} alt={message.imageName || 'Uploaded image'} />
+                              <div className="image-info">
+                                <FileImage size={14} />
+                                <span>{message.imageName}</span>
+                              </div>
+                            </div>
+                          )}
                           
                           {/* Product Cards */}
                           {message.hasProducts && message.products && (
@@ -612,6 +835,37 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                       )}
                     </div>
 
+                    {/* Image Upload Preview */}
+                    {imageUpload && (
+                      <div className="image-upload-preview">
+                        <div className="image-preview-container">
+                          <img src={imageUpload.preview} alt="Upload preview" />
+                          <div className="image-preview-overlay">
+                            <div className="image-info">
+                              <FileImage size={16} />
+                              <span>{imageUpload.file.name}</span>
+                              <span className="file-size">
+                                ({(imageUpload.file.size / 1024 / 1024).toFixed(1)} MB)
+                              </span>
+                            </div>
+                            {imageUpload.uploading && (
+                              <div className="upload-progress">
+                                <div className="upload-spinner"></div>
+                                <span>Uploading...</span>
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            className="remove-image-button"
+                            onClick={removeImageUpload}
+                            disabled={imageUpload.uploading}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Chat Input */}
                     <div className="chat-input-container">
                       <input
@@ -625,6 +879,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                         className="image-upload-button"
                         onClick={handleImageUpload}
                         title="Upload image"
+                        disabled={!!imageUpload}
                       >
                         <Image size={18} />
                       </button>
@@ -635,12 +890,12 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                         onKeyPress={handleKeyPress}
                         placeholder="Ask me anything about products..."
                         className="chat-input"
-                        disabled={isTyping}
+                        disabled={isTyping || (imageUpload?.uploading)}
                       />
                       <button
                         className="send-button"
                         onClick={handleSendMessage}
-                        disabled={!inputMessage.trim() || isTyping}
+                        disabled={(!inputMessage.trim() && !imageUpload) || isTyping || (imageUpload?.uploading)}
                       >
                         <Send size={18} />
                       </button>

@@ -476,13 +476,56 @@ export class FloatingFrameManager {
         height: 100%;
         display: flex;
         flex-direction: column;
+        position: relative;
+      }
+
+      .chat-container.drag-over {
+        background: rgba(37, 99, 235, 0.02);
+      }
+
+      .drag-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(37, 99, 235, 0.1);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        border: 2px dashed #2563eb;
+        border-radius: 12px;
+        margin: 8px;
+      }
+
+      .drag-content {
+        text-align: center;
+        color: #2563eb;
+      }
+
+      .drag-content p {
+        margin-top: 12px;
+        font-weight: 600;
+        font-size: 16px;
+      }
+
+      .loading-messages {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 20px;
+        color: #6b7280;
+        font-size: 14px;
       }
 
       .chat-messages {
         flex: 1;
         padding: 16px;
         overflow-y: auto;
-        max-height: calc(80vh - 180px);
+        max-height: calc(80vh - 240px);
         scrollbar-width: thin;
         scrollbar-color: rgba(107, 114, 128, 0.3) transparent;
       }
@@ -535,11 +578,126 @@ export class FloatingFrameManager {
         border-bottom-left-radius: 4px;
       }
 
+      .message-image {
+        max-width: 80%;
+        margin-top: 8px;
+        border-radius: 12px;
+        overflow: hidden;
+        background: white;
+        border: 1px solid #e5e7eb;
+      }
+
+      .message-image img {
+        width: 100%;
+        height: auto;
+        max-height: 200px;
+        object-fit: cover;
+        display: block;
+      }
+
+      .image-info {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        background: #f9fafb;
+        border-top: 1px solid #e5e7eb;
+        font-size: 12px;
+        color: #6b7280;
+      }
+
       .message-timestamp {
         font-size: 11px;
         color: #9ca3af;
         margin-top: 4px;
         padding: 0 4px;
+      }
+
+      .image-upload-preview {
+        padding: 16px;
+        border-top: 1px solid #e5e7eb;
+        background: #f9fafb;
+      }
+
+      .image-preview-container {
+        position: relative;
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #e5e7eb;
+        max-width: 200px;
+      }
+
+      .image-preview-container img {
+        width: 100%;
+        height: auto;
+        max-height: 120px;
+        object-fit: cover;
+        display: block;
+      }
+
+      .image-preview-overlay {
+        padding: 8px 12px;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(4px);
+      }
+
+      .image-info {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: #374151;
+        margin-bottom: 4px;
+      }
+
+      .file-size {
+        color: #9ca3af;
+        font-size: 11px;
+      }
+
+      .upload-progress {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: #2563eb;
+      }
+
+      .upload-spinner {
+        width: 14px;
+        height: 14px;
+        border: 2px solid rgba(37, 99, 235, 0.2);
+        border-top: 2px solid #2563eb;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      .remove-image-button {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 28px;
+        height: 28px;
+        background: rgba(239, 68, 68, 0.9);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 150ms ease-in-out;
+      }
+
+      .remove-image-button:hover:not(:disabled) {
+        background: #dc2626;
+        transform: scale(1.1);
+      }
+
+      .remove-image-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
       }
 
       .products-section {
@@ -765,9 +923,14 @@ export class FloatingFrameManager {
         transition: all 150ms ease-in-out;
       }
 
-      .image-upload-button:hover {
+      .image-upload-button:hover:not(:disabled) {
         background: #e5e7eb;
         color: #374151;
+      }
+
+      .image-upload-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
       }
 
       .chat-input {
@@ -1129,6 +1292,14 @@ export class FloatingFrameManager {
         .login-icon {
           width: 56px;
           height: 56px;
+        }
+
+        .image-preview-container {
+          max-width: 150px;
+        }
+
+        .image-preview-container img {
+          max-height: 100px;
         }
       }
 
