@@ -98,6 +98,30 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Save message to Supabase
+  const saveMessageToSupabase = useCallback(async (message: ChatMessage, userId: string) => {
+    try {
+      const { error } = await supabase
+        .from('chat_messages')
+        .insert({
+          id: message.id,
+          user_id: userId,
+          type: message.type,
+          content: message.content,
+          has_products: message.hasProducts || false,
+          products_data: message.products || null,
+          created_at: message.timestamp.toISOString(),
+          updated_at: message.timestamp.toISOString()
+        });
+
+      if (error) {
+        console.error('Error saving message to Supabase:', error);
+      }
+    } catch (error) {
+      console.error('Failed to save message:', error);
+    }
+  }, []);
+
   // Load chat messages from Supabase
   const loadChatMessages = useCallback(async (userId: string) => {
     if (!userId) return;
@@ -139,30 +163,6 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
       console.error('Failed to load chat messages:', error);
     } finally {
       setIsLoadingMessages(false);
-    }
-  }, []);
-
-  // Save message to Supabase
-  const saveMessageToSupabase = useCallback(async (message: ChatMessage, userId: string) => {
-    try {
-      const { error } = await supabase
-        .from('chat_messages')
-        .insert({
-          id: message.id,
-          user_id: userId,
-          type: message.type,
-          content: message.content,
-          has_products: message.hasProducts || false,
-          products_data: message.products || null,
-          created_at: message.timestamp.toISOString(),
-          updated_at: message.timestamp.toISOString()
-        });
-
-      if (error) {
-        console.error('Error saving message to Supabase:', error);
-      }
-    } catch (error) {
-      console.error('Failed to save message:', error);
     }
   }, []);
 
