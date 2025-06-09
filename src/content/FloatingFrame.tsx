@@ -101,18 +101,17 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   // Save message to Supabase
   const saveMessageToSupabase = useCallback(async (message: ChatMessage, userId: string) => {
     try {
+      const messageData = {
+        user_id: userId,
+        type: message.type,
+        content: message.content,
+        has_products: message.hasProducts || false,
+        products_data: message.products || null
+      };
+
       const { error } = await supabase
         .from('chat_messages')
-        .insert({
-          id: message.id,
-          user_id: userId,
-          type: message.type,
-          content: message.content,
-          has_products: message.hasProducts || false,
-          products_data: message.products || null,
-          created_at: message.timestamp.toISOString(),
-          updated_at: message.timestamp.toISOString()
-        });
+        .insert(messageData);
 
       if (error) {
         console.error('Error saving message to Supabase:', error);
@@ -152,19 +151,24 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
         setMessages(loadedMessages);
       } else {
         // No existing messages, add welcome message
-        setMessages([{
-          id: '1',
+        const welcomeMessage: ChatMessage = {
+          id: 'welcome-' + Date.now(),
           type: 'assistant',
           content: `Welcome back! I'm your AI shopping assistant. I can help you find products, compare prices, and assist with your shopping needs. How can I help you today?`,
           timestamp: new Date()
-        }]);
+        };
+        
+        setMessages([welcomeMessage]);
+        
+        // Save welcome message to database
+        await saveMessageToSupabase(welcomeMessage, userId);
       }
     } catch (error) {
       console.error('Failed to load chat messages:', error);
     } finally {
       setIsLoadingMessages(false);
     }
-  }, []);
+  }, [saveMessageToSupabase]);
 
   // Initialize component and check auth
   useEffect(() => {
@@ -354,7 +358,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
     if (!inputMessage.trim() || !user) return;
 
     const userMessage: ChatMessage = {
-      id: Date.now().toString(),
+      id: 'user-' + Date.now(),
       type: 'user',
       content: inputMessage,
       timestamp: new Date()
@@ -401,7 +405,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
       };
 
       const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
+        id: 'assistant-' + Date.now(),
         type: 'assistant',
         content: mockResponse.response,
         timestamp: new Date(),
@@ -429,7 +433,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
       const reader = new FileReader();
       reader.onload = (e) => {
         const imageMessage: ChatMessage = {
-          id: Date.now().toString(),
+          id: 'image-' + Date.now(),
           type: 'user',
           content: `[Image uploaded: ${file.name}]`,
           timestamp: new Date()
