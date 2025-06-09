@@ -683,6 +683,23 @@ export class FloatingFrameManager {
 
       .content-section {
         padding: 20px;
+        height: calc(80vh - 120px);
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(107, 114, 128, 0.3) transparent;
+      }
+
+      .content-section::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      .content-section::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .content-section::-webkit-scrollbar-thumb {
+        background: rgba(107, 114, 128, 0.3);
+        border-radius: 3px;
       }
 
       .section-title {
@@ -697,36 +714,153 @@ export class FloatingFrameManager {
         font-size: 14px;
         color: #6b7280;
         line-height: 1.6;
-        margin-bottom: 16px;
+        margin-bottom: 24px;
       }
 
-      .settings-list {
+      .checkout-options {
         display: flex;
         flex-direction: column;
         gap: 16px;
+        margin-bottom: 24px;
       }
 
-      .setting-item {
+      .checkout-option {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 12px 16px;
+        padding: 16px;
         background: #f9fafb;
-        border-radius: 8px;
         border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        transition: all 150ms ease-in-out;
       }
 
-      .setting-label {
+      .checkout-option:hover {
+        background: #f3f4f6;
+        border-color: #d1d5db;
+      }
+
+      .option-content {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex: 1;
+      }
+
+      .option-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        background: rgba(37, 99, 235, 0.1);
+        border-radius: 8px;
+        color: #2563eb;
+      }
+
+      .option-details {
+        flex: 1;
+      }
+
+      .option-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 4px;
+      }
+
+      .option-description {
         font-size: 14px;
-        font-weight: 500;
-        color: #374151;
+        color: #6b7280;
+        line-height: 1.4;
       }
 
-      .setting-checkbox {
-        width: 18px;
-        height: 18px;
+      .option-checkbox {
+        width: 20px;
+        height: 20px;
         accent-color: #2563eb;
         cursor: pointer;
+      }
+
+      .checkout-actions {
+        margin-bottom: 24px;
+      }
+
+      .checkout-button {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 16px 24px;
+        background: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 16px;
+        cursor: pointer;
+        transition: all 150ms ease-in-out;
+      }
+
+      .checkout-button:hover:not(:disabled) {
+        background: #1d4ed8;
+        transform: translateY(-1px);
+        box-shadow: 0 8px 16px rgba(37, 99, 235, 0.3);
+      }
+
+      .checkout-button:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .button-spinner {
+        width: 18px;
+        height: 18px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top: 2px solid white;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      .checkout-info {
+        background: rgba(37, 99, 235, 0.05);
+        border: 1px solid rgba(37, 99, 235, 0.1);
+        border-radius: 8px;
+        padding: 16px;
+      }
+
+      .info-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 8px;
+      }
+
+      .info-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      .info-list li {
+        font-size: 13px;
+        color: #6b7280;
+        padding: 4px 0;
+        padding-left: 16px;
+        position: relative;
+        line-height: 1.4;
+      }
+
+      .info-list li::before {
+        content: "•";
+        color: #2563eb;
+        font-weight: bold;
+        position: absolute;
+        left: 0;
+        top: 4px;
       }
 
       .floating-frame-loading {
@@ -778,6 +912,23 @@ export class FloatingFrameManager {
 
         .product-image {
           height: 100px;
+        }
+
+        .checkout-option {
+          padding: 12px;
+        }
+
+        .option-icon {
+          width: 36px;
+          height: 36px;
+        }
+
+        .option-title {
+          font-size: 14px;
+        }
+
+        .option-description {
+          font-size: 12px;
         }
       }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
-import { X, Minimize2, Maximize2, MessageCircle, Settings, Send, Image, Star, ExternalLink, Eye } from 'lucide-react';
+import { X, Minimize2, Maximize2, MessageCircle, ShoppingCart, Send, Image, Star, ExternalLink, Eye, CreditCard, Package, CheckCircle } from 'lucide-react';
 import { SearchResult } from './actions/searchAction';
 import { FetchProductsResult, Product } from './actions/fetchDOMProductsAction';
 import { FetchLayoutResult, LayoutElement } from './actions/fetchLayoutAction';
@@ -60,10 +60,18 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'chat' | 'settings'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'checkout'>('chat');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  
+  // Checkout options state
+  const [checkoutOptions, setCheckoutOptions] = useState({
+    buyNow: false,
+    cashOnDelivery: false,
+    placeOrder: false
+  });
   
   const frameRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -99,9 +107,68 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   }, [onClose]);
 
   // Handle tab change
-  const handleTabChange = useCallback((tab: 'chat' | 'settings') => {
+  const handleTabChange = useCallback((tab: 'chat' | 'checkout') => {
     setActiveTab(tab);
   }, []);
+
+  // Handle checkout option change
+  const handleCheckoutOptionChange = useCallback((option: keyof typeof checkoutOptions) => {
+    setCheckoutOptions(prev => ({
+      ...prev,
+      [option]: !prev[option]
+    }));
+  }, []);
+
+  // Handle checkout
+  const handleCheckout = useCallback(async () => {
+    const selectedActions: string[] = [];
+    
+    if (checkoutOptions.buyNow) selectedActions.push('buy_now');
+    if (checkoutOptions.cashOnDelivery) selectedActions.push('cash_on_delivery');
+    if (checkoutOptions.placeOrder) selectedActions.push('place_order');
+
+    if (selectedActions.length === 0) {
+      alert('Please select at least one action to automate.');
+      return;
+    }
+
+    setIsCheckingOut(true);
+
+    try {
+      // Send actions to background script
+      for (const action of selectedActions) {
+        await new Promise<void>((resolve, reject) => {
+          chrome.runtime.sendMessage({
+            type: 'APPEND_ACTION',
+            action: action
+          }, (response) => {
+            if (response?.success) {
+              console.log(`Action ${action} added to queue`);
+              resolve();
+            } else {
+              console.error(`Failed to add action ${action}:`, response?.error);
+              reject(new Error(response?.error || 'Unknown error'));
+            }
+          });
+        });
+      }
+
+      alert(`Successfully queued ${selectedActions.length} action(s) for automation:\n${selectedActions.join(', ')}`);
+      
+      // Reset options after successful checkout
+      setCheckoutOptions({
+        buyNow: false,
+        cashOnDelivery: false,
+        placeOrder: false
+      });
+
+    } catch (error) {
+      console.error('Checkout failed:', error);
+      alert('Failed to queue actions. Please try again.');
+    } finally {
+      setIsCheckingOut(false);
+    }
+  }, [checkoutOptions]);
 
   // Handle send message
   const handleSendMessage = useCallback(async () => {
@@ -246,11 +313,11 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                 Chat
               </button>
               <button
-                className={`tab-button ${activeTab === 'settings' ? 'active' : ''}`}
-                onClick={() => handleTabChange('settings')}
+                className={`tab-button ${activeTab === 'checkout' ? 'active' : ''}`}
+                onClick={() => handleTabChange('checkout')}
               >
-                <Settings size={16} />
-                Settings
+                <ShoppingCart size={16} />
+                Quick Checkout
               </button>
             </div>
 
@@ -382,26 +449,103 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                 </div>
               )}
 
-              {activeTab === 'settings' && (
+              {activeTab === 'checkout' && (
                 <div className="content-section">
-                  <div className="section-title">Settings</div>
+                  <div className="section-title">Quick Checkout</div>
                   <div className="section-description">
-                    Configure extension preferences and options
+                    Select which steps you want to automate during checkout
                   </div>
                   
-                  <div className="settings-list">
-                    <div className="setting-item">
-                      <span className="setting-label">Auto-execute actions</span>
-                      <input type="checkbox" className="setting-checkbox" defaultChecked />
+                  <div className="checkout-options">
+                    <div className="checkout-option">
+                      <div className="option-content">
+                        <div className="option-icon">
+                          <Package size={20} />
+                        </div>
+                        <div className="option-details">
+                          <div className="option-title">Buy Now</div>
+                          <div className="option-description">
+                            Automatically click the "Buy Now" button on product pages
+                          </div>
+                        </div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        className="option-checkbox"
+                        checked={checkoutOptions.buyNow}
+                        onChange={() => handleCheckoutOptionChange('buyNow')}
+                      />
                     </div>
-                    <div className="setting-item">
-                      <span className="setting-label">Show notifications</span>
-                      <input type="checkbox" className="setting-checkbox" defaultChecked />
+
+                    <div className="checkout-option">
+                      <div className="option-content">
+                        <div className="option-icon">
+                          <CreditCard size={20} />
+                        </div>
+                        <div className="option-details">
+                          <div className="option-title">Cash on Delivery</div>
+                          <div className="option-description">
+                            Select Cash on Delivery as payment method
+                          </div>
+                        </div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        className="option-checkbox"
+                        checked={checkoutOptions.cashOnDelivery}
+                        onChange={() => handleCheckoutOptionChange('cashOnDelivery')}
+                      />
                     </div>
-                    <div className="setting-item">
-                      <span className="setting-label">Debug mode</span>
-                      <input type="checkbox" className="setting-checkbox" />
+
+                    <div className="checkout-option">
+                      <div className="option-content">
+                        <div className="option-icon">
+                          <CheckCircle size={20} />
+                        </div>
+                        <div className="option-details">
+                          <div className="option-title">Place Your Order</div>
+                          <div className="option-description">
+                            Complete the order by clicking "Place Your Order"
+                          </div>
+                        </div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        className="option-checkbox"
+                        checked={checkoutOptions.placeOrder}
+                        onChange={() => handleCheckoutOptionChange('placeOrder')}
+                      />
                     </div>
+                  </div>
+
+                  <div className="checkout-actions">
+                    <button
+                      className="checkout-button"
+                      onClick={handleCheckout}
+                      disabled={isCheckingOut || Object.values(checkoutOptions).every(v => !v)}
+                    >
+                      {isCheckingOut ? (
+                        <>
+                          <div className="button-spinner"></div>
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <ShoppingCart size={18} />
+                          Start Checkout
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="checkout-info">
+                    <div className="info-title">How it works:</div>
+                    <ul className="info-list">
+                      <li>Select the automation steps you want</li>
+                      <li>Click "Start Checkout" to queue the actions</li>
+                      <li>Navigate to Amazon and the actions will execute automatically</li>
+                      <li>Monitor the progress in the browser console</li>
+                    </ul>
                   </div>
                 </div>
               )}
