@@ -69,7 +69,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   // Checkout options state
   const [checkoutOptions, setCheckoutOptions] = useState({
     buyNow: false,
-    cashOnDelivery: false,
+    paymentMethod: '',
     placeOrder: false
   });
   
@@ -112,10 +112,10 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   }, []);
 
   // Handle checkout option change
-  const handleCheckoutOptionChange = useCallback((option: keyof typeof checkoutOptions) => {
+  const handleCheckoutOptionChange = useCallback((option: keyof typeof checkoutOptions, value?: any) => {
     setCheckoutOptions(prev => ({
       ...prev,
-      [option]: !prev[option]
+      [option]: value !== undefined ? value : !prev[option]
     }));
   }, []);
 
@@ -124,7 +124,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
     const selectedActions: string[] = [];
     
     if (checkoutOptions.buyNow) selectedActions.push('buy_now');
-    if (checkoutOptions.cashOnDelivery) selectedActions.push('cash_on_delivery');
+    if (checkoutOptions.paymentMethod === 'cash_on_delivery') selectedActions.push('cash_on_delivery');
     if (checkoutOptions.placeOrder) selectedActions.push('place_order');
 
     if (selectedActions.length === 0) {
@@ -158,7 +158,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
       // Reset options after successful checkout
       setCheckoutOptions({
         buyNow: false,
-        cashOnDelivery: false,
+        paymentMethod: '',
         placeOrder: false
       });
 
@@ -477,24 +477,28 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                       />
                     </div>
 
-                    <div className="checkout-option">
-                      <div className="option-content">
+                    <div className="payment-method-section">
+                      <div className="payment-method-header">
                         <div className="option-icon">
                           <CreditCard size={20} />
                         </div>
                         <div className="option-details">
-                          <div className="option-title">Cash on Delivery</div>
+                          <div className="option-title">Payment Method</div>
                           <div className="option-description">
-                            Select Cash on Delivery as payment method
+                            Select your preferred payment method for automation
                           </div>
                         </div>
                       </div>
-                      <input
-                        type="checkbox"
-                        className="option-checkbox"
-                        checked={checkoutOptions.cashOnDelivery}
-                        onChange={() => handleCheckoutOptionChange('cashOnDelivery')}
-                      />
+                      <div className="payment-method-select">
+                        <select
+                          value={checkoutOptions.paymentMethod}
+                          onChange={(e) => handleCheckoutOptionChange('paymentMethod', e.target.value)}
+                          className="payment-select"
+                        >
+                          <option value="">Select payment method</option>
+                          <option value="cash_on_delivery">Cash on Delivery</option>
+                        </select>
+                      </div>
                     </div>
 
                     <div className="checkout-option">
@@ -522,7 +526,11 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                     <button
                       className="checkout-button"
                       onClick={handleCheckout}
-                      disabled={isCheckingOut || Object.values(checkoutOptions).every(v => !v)}
+                      disabled={isCheckingOut || (
+                        !checkoutOptions.buyNow && 
+                        !checkoutOptions.paymentMethod && 
+                        !checkoutOptions.placeOrder
+                      )}
                     >
                       {isCheckingOut ? (
                         <>
@@ -542,6 +550,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                     <div className="info-title">How it works:</div>
                     <ul className="info-list">
                       <li>Select the automation steps you want</li>
+                      <li>Choose your preferred payment method</li>
                       <li>Click "Start Checkout" to queue the actions</li>
                       <li>Navigate to Amazon and the actions will execute automatically</li>
                       <li>Monitor the progress in the browser console</li>

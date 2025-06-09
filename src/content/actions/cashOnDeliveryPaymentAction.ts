@@ -7,6 +7,7 @@ export interface CashOnDeliveryResult {
   continueButtonClicked?: boolean;
   codSelector?: string;
   continueSelector?: string;
+  alreadySelected?: boolean;
 }
 
 export async function cashOnDeliveryPaymentAction(): Promise<CashOnDeliveryResult> {
@@ -49,27 +50,34 @@ export async function cashOnDeliveryPaymentAction(): Promise<CashOnDeliveryResul
       codOptionFound: false,
       codOptionSelected: false,
       continueButtonFound: false,
-      continueButtonClicked: false
+      continueButtonClicked: false,
+      alreadySelected: false
     };
 
-    // Step 1: Find and select Cash on Delivery option
+    // Step 1: Find and check Cash on Delivery option
     const codResult = await selectCashOnDelivery();
     result.codOptionFound = codResult.found;
     result.codOptionSelected = codResult.selected;
     result.codSelector = codResult.selector;
+    result.alreadySelected = codResult.alreadySelected;
 
     if (!codResult.found) {
       result.message = 'Cash on Delivery option not found. This might not be available for your location or the selected items.';
       return result;
     }
 
-    if (!codResult.selected) {
+    if (codResult.alreadySelected) {
+      result.success = true;
+      result.message = 'Cash on Delivery is already selected. Proceeding to next step.';
+    } else if (!codResult.selected) {
       result.message = 'Found Cash on Delivery option but failed to select it.';
       return result;
     }
 
-    // Wait a moment for the page to update after COD selection
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Wait a moment for the page to update after COD selection (only if we just selected it)
+    if (!codResult.alreadySelected) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
 
     // Step 2: Find and click Continue/Next button
     const continueResult = await clickContinueButton();
@@ -77,12 +85,16 @@ export async function cashOnDeliveryPaymentAction(): Promise<CashOnDeliveryResul
     result.continueButtonClicked = continueResult.clicked;
     result.continueSelector = continueResult.selector;
 
-    if (result.codOptionSelected && result.continueButtonClicked) {
+    if ((result.codOptionSelected || result.alreadySelected) && result.continueButtonClicked) {
       result.success = true;
-      result.message = 'Successfully selected Cash on Delivery and proceeded to next step.';
-    } else if (result.codOptionSelected && !result.continueButtonFound) {
+      result.message = result.alreadySelected 
+        ? 'Cash on Delivery was already selected. Successfully proceeded to next step.'
+        : 'Successfully selected Cash on Delivery and proceeded to next step.';
+    } else if ((result.codOptionSelected || result.alreadySelected) && !result.continueButtonFound) {
       result.success = true;
-      result.message = 'Successfully selected Cash on Delivery. Continue button not found - you may need to manually proceed.';
+      result.message = result.alreadySelected
+        ? 'Cash on Delivery was already selected. Continue button not found - you may need to manually proceed.'
+        : 'Successfully selected Cash on Delivery. Continue button not found - you may need to manually proceed.';
     } else {
       result.message = 'Selected Cash on Delivery but failed to click continue button.';
     }
@@ -102,7 +114,7 @@ export async function cashOnDeliveryPaymentAction(): Promise<CashOnDeliveryResul
   }
 }
 
-async function selectCashOnDelivery(): Promise<{found: boolean, selected: boolean, selector?: string}> {
+async function selectCashOnDelivery(): Promise<{found: boolean, selected: boolean, selector?: string, alreadySelected?: boolean}> {
   // Amazon Cash on Delivery selectors
   const codSelectors = [
     // Radio button selectors
@@ -183,7 +195,18 @@ async function selectCashOnDelivery(): Promise<{found: boolean, selected: boolea
     return { found: false, selected: false };
   }
 
-  // Select the COD option
+  // Check if COD is already selected
+  if (codOption.checked) {
+    console.log('Cash on Delivery is already selected');
+    return { 
+      found: true, 
+      selected: true, 
+      selector: codSelector,
+      alreadySelected: true
+    };
+  }
+
+  // Select the COD option only if it's not already selected
   try {
     // Scroll into view
     codOption.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -192,24 +215,22 @@ async function selectCashOnDelivery(): Promise<{found: boolean, selected: boolea
     // Focus and select
     codOption.focus();
     
-    if (!codOption.checked) {
-      // Try clicking the radio button
-      codOption.click();
-      
-      // Also try clicking the associated label
-      const label = document.querySelector(`label[for="${codOption.id}"]`) as HTMLElement;
-      if (label) {
-        label.click();
-      }
-      
-      // Dispatch change event
-      const changeEvent = new Event('change', { bubbles: true });
-      codOption.dispatchEvent(changeEvent);
-      
-      // Dispatch click event
-      const clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
-      codOption.dispatchEvent(clickEvent);
+    // Click the radio button
+    codOption.click();
+    
+    // Also try clicking the associated label
+    const label = document.querySelector(`label[for="${codOption.id}"]`) as HTMLElement;
+    if (label) {
+      label.click();
     }
+    
+    // Dispatch change event
+    const changeEvent = new Event('change', { bubbles: true });
+    codOption.dispatchEvent(changeEvent);
+    
+    // Dispatch click event
+    const clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
+    codOption.dispatchEvent(clickEvent);
 
     // Wait a moment and check if it's selected
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -219,12 +240,18 @@ async function selectCashOnDelivery(): Promise<{found: boolean, selected: boolea
     return { 
       found: true, 
       selected: isSelected, 
-      selector: codSelector 
+      selector: codSelector,
+      alreadySelected: false
     };
     
   } catch (error) {
     console.error('Failed to select COD option:', error);
-    return { found: true, selected: false, selector: codSelector };
+    return { 
+      found: true, 
+      selected: false, 
+      selector: codSelector,
+      alreadySelected: false
+    };
   }
 }
 

@@ -740,6 +740,48 @@ export class FloatingFrameManager {
         border-color: #d1d5db;
       }
 
+      .payment-method-section {
+        padding: 16px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        transition: all 150ms ease-in-out;
+      }
+
+      .payment-method-section:hover {
+        background: #f3f4f6;
+        border-color: #d1d5db;
+      }
+
+      .payment-method-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .payment-method-select {
+        margin-left: 52px;
+      }
+
+      .payment-select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background: white;
+        color: #374151;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 150ms ease-in-out;
+      }
+
+      .payment-select:focus {
+        outline: none;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      }
+
       .option-content {
         display: flex;
         align-items: center;
@@ -916,6 +958,14 @@ export class FloatingFrameManager {
 
         .checkout-option {
           padding: 12px;
+        }
+
+        .payment-method-section {
+          padding: 12px;
+        }
+
+        .payment-method-select {
+          margin-left: 48px;
         }
 
         .option-icon {
