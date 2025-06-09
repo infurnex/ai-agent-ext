@@ -57,7 +57,7 @@ interface User {
 
 // Initialize Supabase client
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://hmwchcxvaweffijzstls.supabase.co';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhtd2NoY3h2YXdlZmZpanpzdGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0NTg0ODAsImV4cCI6MjA2NTAzNDQ4MH0.LiC_-lMYV6erflw8bRqBystXhklMG8PpCOgthiFQ-Qk';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ 
