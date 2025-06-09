@@ -424,6 +424,27 @@ export class FloatingFrameManager {
         line-height: 1.4;
       }
 
+      /* Loading Messages */
+      .loading-messages {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+        gap: 16px;
+        color: #6b7280;
+        font-size: 14px;
+      }
+
+      .loading-messages .loading-spinner {
+        width: 32px;
+        height: 32px;
+        border: 3px solid #e5e7eb;
+        border-top: 3px solid #2563eb;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
       /* Tabs and existing styles remain the same */
       .tabs-container {
         width: 100%;

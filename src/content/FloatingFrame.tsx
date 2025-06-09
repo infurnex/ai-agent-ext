@@ -177,8 +177,6 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
             email: session.user.email || ''
           };
           setUser(userData);
-          // Load existing chat messages for this user
-          await loadChatMessages(session.user.id);
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
@@ -198,8 +196,6 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
         };
         setUser(userData);
         setAuthError('');
-        // Load chat messages for the authenticated user
-        await loadChatMessages(session.user.id);
       } else {
         setUser(null);
         setMessages([]);
@@ -207,7 +203,14 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
     });
 
     return () => subscription.unsubscribe();
-  }, [loadChatMessages]);
+  }, []);
+
+  // Load chat messages when user is authenticated
+  useEffect(() => {
+    if (user?.id) {
+      loadChatMessages(user.id);
+    }
+  }, [user?.id, loadChatMessages]);
 
   // Auto-scroll chat to bottom
   useEffect(() => {
@@ -265,7 +268,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
         };
         setUser(userData);
         setLoginForm({ email: '', password: '' });
-        // Load chat messages will be handled by the auth state change listener
+        // Chat messages will be loaded by the useEffect hook
       }
     } catch (error) {
       setAuthError('Login failed. Please try again.');
