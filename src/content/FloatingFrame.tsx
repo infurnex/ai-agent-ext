@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
-import { X, Minimize2, Maximize2, MessageCircle, ShoppingCart, Send, Image, Star, ExternalLink, Eye, CreditCard, Package, CheckCircle, LogIn, User } from 'lucide-react';
+import { X, Minimize2, Maximize2, MessageCircle, ShoppingCart, Send, Image, Star, ExternalLink, Eye, CreditCard, Package, CheckCircle, LogIn, User, AlertCircle } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 import { SearchResult } from './actions/searchAction';
 import { FetchProductsResult, Product } from './actions/fetchDOMProductsAction';
@@ -100,6 +100,11 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   const frameRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Check if we're on Amazon
+  const isAmazonWebsite = useCallback(() => {
+    return window.location.hostname.includes('amazon');
+  }, []);
 
   // Save message to Supabase
   const saveMessageToSupabase = useCallback(async (message: ChatMessage, userId: string) => {
@@ -343,6 +348,12 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
 
   // Handle checkout
   const handleCheckout = useCallback(async () => {
+    // Check if we're on Amazon
+    if (!isAmazonWebsite()) {
+      alert('⚠️ Amazon Required\n\nQuick checkout actions only work on Amazon websites. Please navigate to Amazon first, then try again.');
+      return;
+    }
+
     const selectedActions: string[] = [];
     
     if (checkoutOptions.buyNow) selectedActions.push('buy_now');
@@ -354,43 +365,86 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
       return;
     }
 
+    // Show confirmation dialog
+    const actionNames = {
+      'buy_now': 'Buy Now',
+      'cash_on_delivery': 'Cash on Delivery',
+      'place_order': 'Place Order'
+    };
+
+    const actionList = selectedActions.map(action => actionNames[action as keyof typeof actionNames]).join(', ');
+    
+    const confirmCheckout = confirm(
+      `🛒 Quick Checkout Automation\n\n` +
+      `Selected actions: ${actionList}\n\n` +
+      `These actions will be executed automatically on Amazon pages.\n\n` +
+      `Are you sure you want to proceed?`
+    );
+
+    if (!confirmCheckout) {
+      return;
+    }
+
     setIsCheckingOut(true);
 
     try {
       // Send actions to background script
+      let successCount = 0;
+      
       for (const action of selectedActions) {
-        await new Promise<void>((resolve, reject) => {
-          chrome.runtime.sendMessage({
-            type: 'APPEND_ACTION',
-            action: action
-          }, (response) => {
-            if (response?.success) {
-              console.log(`Action ${action} added to queue`);
-              resolve();
-            } else {
-              console.error(`Failed to add action ${action}:`, response?.error);
-              reject(new Error(response?.error || 'Unknown error'));
-            }
+        try {
+          await new Promise<void>((resolve, reject) => {
+            chrome.runtime.sendMessage({
+              type: 'APPEND_ACTION',
+              action: action
+            }, (response) => {
+              if (chrome.runtime.lastError) {
+                console.error('Chrome runtime error:', chrome.runtime.lastError);
+                reject(new Error(chrome.runtime.lastError.message));
+                return;
+              }
+              
+              if (response?.success) {
+                console.log(`Action ${action} added to queue successfully`);
+                successCount++;
+                resolve();
+              } else {
+                console.error(`Failed to add action ${action}:`, response?.error);
+                reject(new Error(response?.error || 'Unknown error'));
+              }
+            });
           });
-        });
+        } catch (error) {
+          console.error(`Failed to queue action ${action}:`, error);
+        }
       }
 
-      alert(`Successfully queued ${selectedActions.length} action(s) for automation:\n${selectedActions.join(', ')}`);
-      
-      // Reset options after successful checkout
-      setCheckoutOptions({
-        buyNow: false,
-        paymentMethod: '',
-        placeOrder: false
-      });
+      if (successCount > 0) {
+        alert(
+          `✅ Success!\n\n` +
+          `${successCount} action(s) have been queued for automation:\n` +
+          `${selectedActions.slice(0, successCount).map(action => actionNames[action as keyof typeof actionNames]).join(', ')}\n\n` +
+          `Actions will execute automatically when you navigate to the appropriate Amazon pages.\n\n` +
+          `Watch for notifications in the top-right corner of the page.`
+        );
+        
+        // Reset options after successful checkout
+        setCheckoutOptions({
+          buyNow: false,
+          paymentMethod: '',
+          placeOrder: false
+        });
+      } else {
+        alert('❌ Failed to queue any actions. Please try again.');
+      }
 
     } catch (error) {
       console.error('Checkout failed:', error);
-      alert('Failed to queue actions. Please try again.');
+      alert('❌ Failed to queue actions. Please check the console for details and try again.');
     } finally {
       setIsCheckingOut(false);
     }
-  }, [checkoutOptions]);
+  }, [checkoutOptions, isAmazonWebsite]);
 
   // Handle send message
   const handleSendMessage = useCallback(async () => {
@@ -765,8 +819,23 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                   <div className="content-section">
                     <div className="section-title">Quick Checkout</div>
                     <div className="section-description">
-                      Select which steps you want to automate during checkout
+                      Select which steps you want to automate during checkout on Amazon
                     </div>
+                    
+                    {/* Amazon Warning */}
+                    {!isAmazonWebsite() && (
+                      <div className="amazon-warning">
+                        <div className="warning-icon">
+                          <AlertCircle size={20} />
+                        </div>
+                        <div className="warning-content">
+                          <div className="warning-title">Amazon Required</div>
+                          <div className="warning-text">
+                            Quick checkout actions only work on Amazon websites. Navigate to Amazon first to use this feature.
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     
                     <div className="checkout-options">
                       <div className="checkout-option">
@@ -786,6 +855,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                           className="option-checkbox"
                           checked={checkoutOptions.buyNow}
                           onChange={() => handleCheckoutOptionChange('buyNow')}
+                          disabled={!isAmazonWebsite()}
                         />
                       </div>
 
@@ -806,6 +876,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                             value={checkoutOptions.paymentMethod}
                             onChange={(e) => handleCheckoutOptionChange('paymentMethod', e.target.value)}
                             className="payment-select"
+                            disabled={!isAmazonWebsite()}
                           >
                             <option value="">Select payment method</option>
                             <option value="cash_on_delivery">Cash on Delivery</option>
@@ -830,6 +901,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                           className="option-checkbox"
                           checked={checkoutOptions.placeOrder}
                           onChange={() => handleCheckoutOptionChange('placeOrder')}
+                          disabled={!isAmazonWebsite()}
                         />
                       </div>
                     </div>
@@ -838,7 +910,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                       <button
                         className="checkout-button"
                         onClick={handleCheckout}
-                        disabled={isCheckingOut || (
+                        disabled={isCheckingOut || !isAmazonWebsite() || (
                           !checkoutOptions.buyNow && 
                           !checkoutOptions.paymentMethod && 
                           !checkoutOptions.placeOrder
@@ -861,11 +933,12 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                     <div className="checkout-info">
                       <div className="info-title">How it works:</div>
                       <ul className="info-list">
+                        <li>Navigate to Amazon first (required)</li>
                         <li>Select the automation steps you want</li>
                         <li>Choose your preferred payment method</li>
                         <li>Click "Start Checkout" to queue the actions</li>
-                        <li>Navigate to Amazon and the actions will execute automatically</li>
-                        <li>Monitor the progress in the browser console</li>
+                        <li>Actions will execute automatically on Amazon pages</li>
+                        <li>Watch for notifications showing action results</li>
                       </ul>
                     </div>
                   </div>

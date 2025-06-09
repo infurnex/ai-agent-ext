@@ -445,6 +445,47 @@ export class FloatingFrameManager {
         animation: spin 1s linear infinite;
       }
 
+      /* Amazon Warning */
+      .amazon-warning {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 16px;
+        background: rgba(245, 158, 11, 0.1);
+        border: 1px solid rgba(245, 158, 11, 0.2);
+        border-radius: 12px;
+        margin-bottom: 24px;
+      }
+
+      .warning-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        background: rgba(245, 158, 11, 0.2);
+        border-radius: 8px;
+        color: #d97706;
+        flex-shrink: 0;
+      }
+
+      .warning-content {
+        flex: 1;
+      }
+
+      .warning-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #92400e;
+        margin-bottom: 4px;
+      }
+
+      .warning-text {
+        font-size: 14px;
+        color: #a16207;
+        line-height: 1.4;
+      }
+
       /* Tabs and existing styles remain the same */
       .tabs-container {
         width: 100%;
@@ -970,6 +1011,12 @@ export class FloatingFrameManager {
         box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
       }
 
+      .payment-select:disabled {
+        background: #f9fafb;
+        color: #9ca3af;
+        cursor: not-allowed;
+      }
+
       .option-content {
         display: flex;
         align-items: center;
@@ -1010,6 +1057,11 @@ export class FloatingFrameManager {
         height: 20px;
         accent-color: #2563eb;
         cursor: pointer;
+      }
+
+      .option-checkbox:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
       }
 
       .checkout-actions {
