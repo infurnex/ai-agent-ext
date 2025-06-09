@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
-import { X, Minimize2, Maximize2, MessageCircle, ShoppingCart, Send, Image, Star, ExternalLink, Eye, CreditCard, Package, CheckCircle } from 'lucide-react';
+import { X, Minimize2, Maximize2, MessageCircle, ShoppingCart, Send, Image, Star, ExternalLink, Eye, CreditCard, Package, CheckCircle, LogIn, User } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 import { SearchResult } from './actions/searchAction';
 import { FetchProductsResult, Product } from './actions/fetchDOMProductsAction';
 import { FetchLayoutResult, LayoutElement } from './actions/fetchLayoutAction';
@@ -49,6 +50,16 @@ interface ChatMessage {
   };
 }
 
+interface User {
+  id: string;
+  email: string;
+}
+
+// Initialize Supabase client
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ 
   onClose, 
   onSearch, 
@@ -66,6 +77,15 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   const [isTyping, setIsTyping] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   
+  // Authentication state
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [loginForm, setLoginForm] = useState({
+    email: '',
+    password: ''
+  });
+  const [authError, setAuthError] = useState<string>('');
+  
   // Checkout options state
   const [checkoutOptions, setCheckoutOptions] = useState({
     buyNow: false,
@@ -77,16 +97,48 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Initialize component
+  // Initialize component and check auth
   useEffect(() => {
-    setIsLoading(false);
-    // Add welcome message
-    setMessages([{
-      id: '1',
-      type: 'assistant',
-      content: 'Hello! I\'m your AI shopping assistant. I can help you find products, compare prices, and assist with your shopping needs. How can I help you today?',
-      timestamp: new Date()
-    }]);
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setUser({
+            id: session.user.id,
+            email: session.user.email || ''
+          });
+          // Add welcome message for authenticated users
+          setMessages([{
+            id: '1',
+            type: 'assistant',
+            content: `Welcome back! I'm your AI shopping assistant. I can help you find products, compare prices, and assist with your shopping needs. How can I help you today?`,
+            timestamp: new Date()
+          }]);
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        setUser({
+          id: session.user.id,
+          email: session.user.email || ''
+        });
+        setAuthError('');
+      } else {
+        setUser(null);
+        setMessages([]);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   // Auto-scroll chat to bottom
@@ -109,6 +161,67 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   // Handle tab change
   const handleTabChange = useCallback((tab: 'chat' | 'checkout') => {
     setActiveTab(tab);
+  }, []);
+
+  // Handle login form change
+  const handleLoginFormChange = useCallback((field: 'email' | 'password', value: string) => {
+    setLoginForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    setAuthError('');
+  }, []);
+
+  // Handle login
+  const handleLogin = useCallback(async () => {
+    if (!loginForm.email || !loginForm.password) {
+      setAuthError('Please enter both email and password');
+      return;
+    }
+
+    setIsAuthenticating(true);
+    setAuthError('');
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: loginForm.email,
+        password: loginForm.password
+      });
+
+      if (error) {
+        setAuthError(error.message);
+      } else if (data.user) {
+        setUser({
+          id: data.user.id,
+          email: data.user.email || ''
+        });
+        setLoginForm({ email: '', password: '' });
+        // Add welcome message
+        setMessages([{
+          id: '1',
+          type: 'assistant',
+          content: `Welcome back, ${data.user.email}! I'm your AI shopping assistant. I can help you find products, compare prices, and assist with your shopping needs. How can I help you today?`,
+          timestamp: new Date()
+        }]);
+      }
+    } catch (error) {
+      setAuthError('Login failed. Please try again.');
+      console.error('Login error:', error);
+    } finally {
+      setIsAuthenticating(false);
+    }
+  }, [loginForm]);
+
+  // Handle logout
+  const handleLogout = useCallback(async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setMessages([]);
+      setLoginForm({ email: '', password: '' });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   }, []);
 
   // Handle checkout option change
@@ -259,9 +372,13 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   const handleKeyPress = useCallback((event: React.KeyboardEvent) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
-      handleSendMessage();
+      if (user) {
+        handleSendMessage();
+      } else {
+        handleLogin();
+      }
     }
-  }, [handleSendMessage]);
+  }, [handleSendMessage, handleLogin, user]);
 
   if (isLoading) {
     return (
@@ -279,9 +396,21 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
       {/* Header */}
       <div className="floating-frame-header">
         <div className="header-content">
-          <span className="header-title">AI Assistant</span>
+          <span className="header-title">
+            {user ? `AI Assistant - ${user.email}` : 'AI Assistant - Login Required'}
+          </span>
         </div>
         <div className="header-controls">
+          {user && (
+            <button
+              className="control-button"
+              onClick={handleLogout}
+              aria-label="Logout"
+              title="Logout"
+            >
+              <User size={16} />
+            </button>
+          )}
           <button
             className="control-button"
             onClick={toggleExpanded}
@@ -302,264 +431,335 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
       {/* Content */}
       {isExpanded && (
         <div className="floating-frame-content">
-          {/* Tabs */}
-          <div className="tabs-container">
-            <div className="tabs-header">
-              <button
-                className={`tab-button ${activeTab === 'chat' ? 'active' : ''}`}
-                onClick={() => handleTabChange('chat')}
-              >
-                <MessageCircle size={16} />
-                Chat
-              </button>
-              <button
-                className={`tab-button ${activeTab === 'checkout' ? 'active' : ''}`}
-                onClick={() => handleTabChange('checkout')}
-              >
-                <ShoppingCart size={16} />
-                Quick Checkout
-              </button>
+          {!user ? (
+            /* Login Form */
+            <div className="login-container">
+              <div className="login-header">
+                <div className="login-icon">
+                  <LogIn size={32} />
+                </div>
+                <h2 className="login-title">Welcome Back</h2>
+                <p className="login-subtitle">Sign in to access your AI shopping assistant</p>
+              </div>
+              
+              <div className="login-form">
+                <div className="form-group">
+                  <label className="form-label">Email</label>
+                  <input
+                    type="email"
+                    value={loginForm.email}
+                    onChange={(e) => handleLoginFormChange('email', e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Enter your email"
+                    className="form-input"
+                    disabled={isAuthenticating}
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label className="form-label">Password</label>
+                  <input
+                    type="password"
+                    value={loginForm.password}
+                    onChange={(e) => handleLoginFormChange('password', e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Enter your password"
+                    className="form-input"
+                    disabled={isAuthenticating}
+                  />
+                </div>
+                
+                {authError && (
+                  <div className="auth-error">
+                    {authError}
+                  </div>
+                )}
+                
+                <button
+                  onClick={handleLogin}
+                  disabled={isAuthenticating || !loginForm.email || !loginForm.password}
+                  className="login-button"
+                >
+                  {isAuthenticating ? (
+                    <>
+                      <div className="button-spinner"></div>
+                      Signing in...
+                    </>
+                  ) : (
+                    <>
+                      <LogIn size={18} />
+                      Sign In
+                    </>
+                  )}
+                </button>
+              </div>
+              
+              <div className="login-footer">
+                <p className="login-help">
+                  Need an account? Contact your administrator to get access.
+                </p>
+              </div>
             </div>
+          ) : (
+            /* Authenticated Content - Tabs */
+            <div className="tabs-container">
+              <div className="tabs-header">
+                <button
+                  className={`tab-button ${activeTab === 'chat' ? 'active' : ''}`}
+                  onClick={() => handleTabChange('chat')}
+                >
+                  <MessageCircle size={16} />
+                  Chat
+                </button>
+                <button
+                  className={`tab-button ${activeTab === 'checkout' ? 'active' : ''}`}
+                  onClick={() => handleTabChange('checkout')}
+                >
+                  <ShoppingCart size={16} />
+                  Quick Checkout
+                </button>
+              </div>
 
-            {/* Tab Content */}
-            <div className="tab-content">
-              {activeTab === 'chat' && (
-                <div className="chat-container">
-                  {/* Chat Messages */}
-                  <div className="chat-messages" ref={chatContainerRef}>
-                    {messages.map((message) => (
-                      <div key={message.id} className={`message ${message.type}`}>
-                        <div className="message-content">
-                          {message.content}
-                        </div>
-                        
-                        {/* Product Cards */}
-                        {message.hasProducts && message.products && (
-                          <div className="products-section">
-                            {message.products.selectedProducts.map((product, index) => (
-                              <div key={index} className="product-card">
-                                <div className="product-image">
-                                  <img src={product.thumbnail} alt={product.title} />
-                                  {product.is_prime && <div className="prime-badge">Prime</div>}
-                                </div>
-                                <div className="product-info">
-                                  <h4 className="product-title">{product.title}</h4>
-                                  <div className="product-rating">
-                                    <div className="stars">
-                                      <Star size={14} fill="#fbbf24" color="#fbbf24" />
-                                      <span>{product.rating}</span>
-                                    </div>
-                                    <span className="reviews">({product.reviews} reviews)</span>
+              {/* Tab Content */}
+              <div className="tab-content">
+                {activeTab === 'chat' && (
+                  <div className="chat-container">
+                    {/* Chat Messages */}
+                    <div className="chat-messages" ref={chatContainerRef}>
+                      {messages.map((message) => (
+                        <div key={message.id} className={`message ${message.type}`}>
+                          <div className="message-content">
+                            {message.content}
+                          </div>
+                          
+                          {/* Product Cards */}
+                          {message.hasProducts && message.products && (
+                            <div className="products-section">
+                              {message.products.selectedProducts.map((product, index) => (
+                                <div key={index} className="product-card">
+                                  <div className="product-image">
+                                    <img src={product.thumbnail} alt={product.title} />
+                                    {product.is_prime && <div className="prime-badge">Prime</div>}
                                   </div>
-                                  <div className="product-pricing">
-                                    <span className="current-price">{product.price}</span>
-                                    {product.original_price && (
-                                      <span className="original-price">{product.original_price}</span>
+                                  <div className="product-info">
+                                    <h4 className="product-title">{product.title}</h4>
+                                    <div className="product-rating">
+                                      <div className="stars">
+                                        <Star size={14} fill="#fbbf24" color="#fbbf24" />
+                                        <span>{product.rating}</span>
+                                      </div>
+                                      <span className="reviews">({product.reviews} reviews)</span>
+                                    </div>
+                                    <div className="product-pricing">
+                                      <span className="current-price">{product.price}</span>
+                                      {product.original_price && (
+                                        <span className="original-price">{product.original_price}</span>
+                                      )}
+                                    </div>
+                                    {product.fulfillment?.standard_delivery && (
+                                      <div className="delivery-info">
+                                        {product.fulfillment.standard_delivery.text}
+                                      </div>
                                     )}
-                                  </div>
-                                  {product.fulfillment?.standard_delivery && (
-                                    <div className="delivery-info">
-                                      {product.fulfillment.standard_delivery.text}
+                                    <div className="product-reason">
+                                      <strong>Why this product:</strong> {product.reason}
                                     </div>
-                                  )}
-                                  <div className="product-reason">
-                                    <strong>Why this product:</strong> {product.reason}
-                                  </div>
-                                  <div className="product-actions">
-                                    <a 
-                                      href={product.link} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer"
-                                      className="view-product-button"
-                                    >
-                                      <Eye size={16} />
-                                      View Product
-                                    </a>
+                                    <div className="product-actions">
+                                      <a 
+                                        href={product.link} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="view-product-button"
+                                      >
+                                        <Eye size={16} />
+                                        View Product
+                                      </a>
+                                    </div>
                                   </div>
                                 </div>
+                              ))}
+                              
+                              {/* Take Me There Button */}
+                              <div className="take-me-there">
+                                <a 
+                                  href={message.products.takeMeThere} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="take-me-there-button"
+                                >
+                                  <ExternalLink size={16} />
+                                  View All Results on Amazon
+                                </a>
                               </div>
-                            ))}
-                            
-                            {/* Take Me There Button */}
-                            <div className="take-me-there">
-                              <a 
-                                href={message.products.takeMeThere} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="take-me-there-button"
-                              >
-                                <ExternalLink size={16} />
-                                View All Results on Amazon
-                              </a>
+                            </div>
+                          )}
+                          
+                          <div className="message-timestamp">
+                            {message.timestamp.toLocaleTimeString()}
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {/* Typing Indicator */}
+                      {isTyping && (
+                        <div className="message assistant">
+                          <div className="typing-indicator">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Chat Input */}
+                    <div className="chat-input-container">
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileSelect}
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                      />
+                      <button
+                        className="image-upload-button"
+                        onClick={handleImageUpload}
+                        title="Upload image"
+                      >
+                        <Image size={18} />
+                      </button>
+                      <input
+                        type="text"
+                        value={inputMessage}
+                        onChange={(e) => setInputMessage(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                        placeholder="Ask me anything about products..."
+                        className="chat-input"
+                        disabled={isTyping}
+                      />
+                      <button
+                        className="send-button"
+                        onClick={handleSendMessage}
+                        disabled={!inputMessage.trim() || isTyping}
+                      >
+                        <Send size={18} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'checkout' && (
+                  <div className="content-section">
+                    <div className="section-title">Quick Checkout</div>
+                    <div className="section-description">
+                      Select which steps you want to automate during checkout
+                    </div>
+                    
+                    <div className="checkout-options">
+                      <div className="checkout-option">
+                        <div className="option-content">
+                          <div className="option-icon">
+                            <Package size={20} />
+                          </div>
+                          <div className="option-details">
+                            <div className="option-title">Buy Now</div>
+                            <div className="option-description">
+                              Automatically click the "Buy Now" button on product pages
                             </div>
                           </div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          className="option-checkbox"
+                          checked={checkoutOptions.buyNow}
+                          onChange={() => handleCheckoutOptionChange('buyNow')}
+                        />
+                      </div>
+
+                      <div className="payment-method-section">
+                        <div className="payment-method-header">
+                          <div className="option-icon">
+                            <CreditCard size={20} />
+                          </div>
+                          <div className="option-details">
+                            <div className="option-title">Payment Method</div>
+                            <div className="option-description">
+                              Select your preferred payment method for automation
+                            </div>
+                          </div>
+                        </div>
+                        <div className="payment-method-select">
+                          <select
+                            value={checkoutOptions.paymentMethod}
+                            onChange={(e) => handleCheckoutOptionChange('paymentMethod', e.target.value)}
+                            className="payment-select"
+                          >
+                            <option value="">Select payment method</option>
+                            <option value="cash_on_delivery">Cash on Delivery</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="checkout-option">
+                        <div className="option-content">
+                          <div className="option-icon">
+                            <CheckCircle size={20} />
+                          </div>
+                          <div className="option-details">
+                            <div className="option-title">Place Your Order</div>
+                            <div className="option-description">
+                              Complete the order by clicking "Place Your Order"
+                            </div>
+                          </div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          className="option-checkbox"
+                          checked={checkoutOptions.placeOrder}
+                          onChange={() => handleCheckoutOptionChange('placeOrder')}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="checkout-actions">
+                      <button
+                        className="checkout-button"
+                        onClick={handleCheckout}
+                        disabled={isCheckingOut || (
+                          !checkoutOptions.buyNow && 
+                          !checkoutOptions.paymentMethod && 
+                          !checkoutOptions.placeOrder
                         )}
-                        
-                        <div className="message-timestamp">
-                          {message.timestamp.toLocaleTimeString()}
-                        </div>
-                      </div>
-                    ))}
-                    
-                    {/* Typing Indicator */}
-                    {isTyping && (
-                      <div className="message assistant">
-                        <div className="typing-indicator">
-                          <span></span>
-                          <span></span>
-                          <span></span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Chat Input */}
-                  <div className="chat-input-container">
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileSelect}
-                      accept="image/*"
-                      style={{ display: 'none' }}
-                    />
-                    <button
-                      className="image-upload-button"
-                      onClick={handleImageUpload}
-                      title="Upload image"
-                    >
-                      <Image size={18} />
-                    </button>
-                    <input
-                      type="text"
-                      value={inputMessage}
-                      onChange={(e) => setInputMessage(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      placeholder="Ask me anything about products..."
-                      className="chat-input"
-                      disabled={isTyping}
-                    />
-                    <button
-                      className="send-button"
-                      onClick={handleSendMessage}
-                      disabled={!inputMessage.trim() || isTyping}
-                    >
-                      <Send size={18} />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 'checkout' && (
-                <div className="content-section">
-                  <div className="section-title">Quick Checkout</div>
-                  <div className="section-description">
-                    Select which steps you want to automate during checkout
-                  </div>
-                  
-                  <div className="checkout-options">
-                    <div className="checkout-option">
-                      <div className="option-content">
-                        <div className="option-icon">
-                          <Package size={20} />
-                        </div>
-                        <div className="option-details">
-                          <div className="option-title">Buy Now</div>
-                          <div className="option-description">
-                            Automatically click the "Buy Now" button on product pages
-                          </div>
-                        </div>
-                      </div>
-                      <input
-                        type="checkbox"
-                        className="option-checkbox"
-                        checked={checkoutOptions.buyNow}
-                        onChange={() => handleCheckoutOptionChange('buyNow')}
-                      />
+                      >
+                        {isCheckingOut ? (
+                          <>
+                            <div className="button-spinner"></div>
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <ShoppingCart size={18} />
+                            Start Checkout
+                          </>
+                        )}
+                      </button>
                     </div>
 
-                    <div className="payment-method-section">
-                      <div className="payment-method-header">
-                        <div className="option-icon">
-                          <CreditCard size={20} />
-                        </div>
-                        <div className="option-details">
-                          <div className="option-title">Payment Method</div>
-                          <div className="option-description">
-                            Select your preferred payment method for automation
-                          </div>
-                        </div>
-                      </div>
-                      <div className="payment-method-select">
-                        <select
-                          value={checkoutOptions.paymentMethod}
-                          onChange={(e) => handleCheckoutOptionChange('paymentMethod', e.target.value)}
-                          className="payment-select"
-                        >
-                          <option value="">Select payment method</option>
-                          <option value="cash_on_delivery">Cash on Delivery</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="checkout-option">
-                      <div className="option-content">
-                        <div className="option-icon">
-                          <CheckCircle size={20} />
-                        </div>
-                        <div className="option-details">
-                          <div className="option-title">Place Your Order</div>
-                          <div className="option-description">
-                            Complete the order by clicking "Place Your Order"
-                          </div>
-                        </div>
-                      </div>
-                      <input
-                        type="checkbox"
-                        className="option-checkbox"
-                        checked={checkoutOptions.placeOrder}
-                        onChange={() => handleCheckoutOptionChange('placeOrder')}
-                      />
+                    <div className="checkout-info">
+                      <div className="info-title">How it works:</div>
+                      <ul className="info-list">
+                        <li>Select the automation steps you want</li>
+                        <li>Choose your preferred payment method</li>
+                        <li>Click "Start Checkout" to queue the actions</li>
+                        <li>Navigate to Amazon and the actions will execute automatically</li>
+                        <li>Monitor the progress in the browser console</li>
+                      </ul>
                     </div>
                   </div>
-
-                  <div className="checkout-actions">
-                    <button
-                      className="checkout-button"
-                      onClick={handleCheckout}
-                      disabled={isCheckingOut || (
-                        !checkoutOptions.buyNow && 
-                        !checkoutOptions.paymentMethod && 
-                        !checkoutOptions.placeOrder
-                      )}
-                    >
-                      {isCheckingOut ? (
-                        <>
-                          <div className="button-spinner"></div>
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          <ShoppingCart size={18} />
-                          Start Checkout
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  <div className="checkout-info">
-                    <div className="info-title">How it works:</div>
-                    <ul className="info-list">
-                      <li>Select the automation steps you want</li>
-                      <li>Choose your preferred payment method</li>
-                      <li>Click "Start Checkout" to queue the actions</li>
-                      <li>Navigate to Amazon and the actions will execute automatically</li>
-                      <li>Monitor the progress in the browser console</li>
-                    </ul>
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
     </div>
