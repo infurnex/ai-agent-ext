@@ -76,6 +76,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   
   // Authentication state
   const [user, setUser] = useState<User | null>(null);
@@ -97,23 +98,87 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Load chat messages from Supabase
+  const loadChatMessages = useCallback(async (userId: string) => {
+    if (!userId) return;
+
+    setIsLoadingMessages(true);
+    try {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error loading chat messages:', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const loadedMessages: ChatMessage[] = data.map(msg => ({
+          id: msg.id,
+          type: msg.type as 'user' | 'assistant',
+          content: msg.content,
+          timestamp: new Date(msg.created_at),
+          hasProducts: msg.has_products || false,
+          products: msg.products_data || undefined
+        }));
+
+        setMessages(loadedMessages);
+      } else {
+        // No existing messages, add welcome message
+        setMessages([{
+          id: '1',
+          type: 'assistant',
+          content: `Welcome back! I'm your AI shopping assistant. I can help you find products, compare prices, and assist with your shopping needs. How can I help you today?`,
+          timestamp: new Date()
+        }]);
+      }
+    } catch (error) {
+      console.error('Failed to load chat messages:', error);
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  }, []);
+
+  // Save message to Supabase
+  const saveMessageToSupabase = useCallback(async (message: ChatMessage, userId: string) => {
+    try {
+      const { error } = await supabase
+        .from('chat_messages')
+        .insert({
+          id: message.id,
+          user_id: userId,
+          type: message.type,
+          content: message.content,
+          has_products: message.hasProducts || false,
+          products_data: message.products || null,
+          created_at: message.timestamp.toISOString(),
+          updated_at: message.timestamp.toISOString()
+        });
+
+      if (error) {
+        console.error('Error saving message to Supabase:', error);
+      }
+    } catch (error) {
+      console.error('Failed to save message:', error);
+    }
+  }, []);
+
   // Initialize component and check auth
   useEffect(() => {
     const initializeAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
-          setUser({
+          const userData = {
             id: session.user.id,
             email: session.user.email || ''
-          });
-          // Add welcome message for authenticated users
-          setMessages([{
-            id: '1',
-            type: 'assistant',
-            content: `Welcome back! I'm your AI shopping assistant. I can help you find products, compare prices, and assist with your shopping needs. How can I help you today?`,
-            timestamp: new Date()
-          }]);
+          };
+          setUser(userData);
+          // Load existing chat messages for this user
+          await loadChatMessages(session.user.id);
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
@@ -125,13 +190,16 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
     initializeAuth();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
-        setUser({
+        const userData = {
           id: session.user.id,
           email: session.user.email || ''
-        });
+        };
+        setUser(userData);
         setAuthError('');
+        // Load chat messages for the authenticated user
+        await loadChatMessages(session.user.id);
       } else {
         setUser(null);
         setMessages([]);
@@ -139,7 +207,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [loadChatMessages]);
 
   // Auto-scroll chat to bottom
   useEffect(() => {
@@ -191,18 +259,13 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
       if (error) {
         setAuthError(error.message);
       } else if (data.user) {
-        setUser({
+        const userData = {
           id: data.user.id,
           email: data.user.email || ''
-        });
+        };
+        setUser(userData);
         setLoginForm({ email: '', password: '' });
-        // Add welcome message
-        setMessages([{
-          id: '1',
-          type: 'assistant',
-          content: `Welcome back, ${data.user.email}! I'm your AI shopping assistant. I can help you find products, compare prices, and assist with your shopping needs. How can I help you today?`,
-          timestamp: new Date()
-        }]);
+        // Load chat messages will be handled by the auth state change listener
       }
     } catch (error) {
       setAuthError('Login failed. Please try again.');
@@ -285,7 +348,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
 
   // Handle send message
   const handleSendMessage = useCallback(async () => {
-    if (!inputMessage.trim()) return;
+    if (!inputMessage.trim() || !user) return;
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -298,8 +361,11 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
     setInputMessage('');
     setIsTyping(true);
 
+    // Save user message to Supabase
+    await saveMessageToSupabase(userMessage, user.id);
+
     // Simulate AI response (replace with actual API call)
-    setTimeout(() => {
+    setTimeout(async () => {
       const mockResponse = {
         response: "I found some great laptops for you! Here are my top recommendations based on your requirements.",
         hasProducts: true,
@@ -342,8 +408,11 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
 
       setMessages(prev => [...prev, assistantMessage]);
       setIsTyping(false);
+
+      // Save assistant message to Supabase
+      await saveMessageToSupabase(assistantMessage, user.id);
     }, 2000);
-  }, [inputMessage]);
+  }, [inputMessage, user, saveMessageToSupabase]);
 
   // Handle image upload
   const handleImageUpload = useCallback(() => {
@@ -526,79 +595,86 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                   <div className="chat-container">
                     {/* Chat Messages */}
                     <div className="chat-messages" ref={chatContainerRef}>
-                      {messages.map((message) => (
-                        <div key={message.id} className={`message ${message.type}`}>
-                          <div className="message-content">
-                            {message.content}
-                          </div>
-                          
-                          {/* Product Cards */}
-                          {message.hasProducts && message.products && (
-                            <div className="products-section">
-                              {message.products.selectedProducts.map((product, index) => (
-                                <div key={index} className="product-card">
-                                  <div className="product-image">
-                                    <img src={product.thumbnail} alt={product.title} />
-                                    {product.is_prime && <div className="prime-badge">Prime</div>}
-                                  </div>
-                                  <div className="product-info">
-                                    <h4 className="product-title">{product.title}</h4>
-                                    <div className="product-rating">
-                                      <div className="stars">
-                                        <Star size={14} fill="#fbbf24" color="#fbbf24" />
-                                        <span>{product.rating}</span>
-                                      </div>
-                                      <span className="reviews">({product.reviews} reviews)</span>
-                                    </div>
-                                    <div className="product-pricing">
-                                      <span className="current-price">{product.price}</span>
-                                      {product.original_price && (
-                                        <span className="original-price">{product.original_price}</span>
-                                      )}
-                                    </div>
-                                    {product.fulfillment?.standard_delivery && (
-                                      <div className="delivery-info">
-                                        {product.fulfillment.standard_delivery.text}
-                                      </div>
-                                    )}
-                                    <div className="product-reason">
-                                      <strong>Why this product:</strong> {product.reason}
-                                    </div>
-                                    <div className="product-actions">
-                                      <a 
-                                        href={product.link} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="view-product-button"
-                                      >
-                                        <Eye size={16} />
-                                        View Product
-                                      </a>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                              
-                              {/* Take Me There Button */}
-                              <div className="take-me-there">
-                                <a 
-                                  href={message.products.takeMeThere} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="take-me-there-button"
-                                >
-                                  <ExternalLink size={16} />
-                                  View All Results on Amazon
-                                </a>
-                              </div>
-                            </div>
-                          )}
-                          
-                          <div className="message-timestamp">
-                            {message.timestamp.toLocaleTimeString()}
-                          </div>
+                      {isLoadingMessages ? (
+                        <div className="loading-messages">
+                          <div className="loading-spinner"></div>
+                          <span>Loading your chat history...</span>
                         </div>
-                      ))}
+                      ) : (
+                        messages.map((message) => (
+                          <div key={message.id} className={`message ${message.type}`}>
+                            <div className="message-content">
+                              {message.content}
+                            </div>
+                            
+                            {/* Product Cards */}
+                            {message.hasProducts && message.products && (
+                              <div className="products-section">
+                                {message.products.selectedProducts.map((product, index) => (
+                                  <div key={index} className="product-card">
+                                    <div className="product-image">
+                                      <img src={product.thumbnail} alt={product.title} />
+                                      {product.is_prime && <div className="prime-badge">Prime</div>}
+                                    </div>
+                                    <div className="product-info">
+                                      <h4 className="product-title">{product.title}</h4>
+                                      <div className="product-rating">
+                                        <div className="stars">
+                                          <Star size={14} fill="#fbbf24" color="#fbbf24" />
+                                          <span>{product.rating}</span>
+                                        </div>
+                                        <span className="reviews">({product.reviews} reviews)</span>
+                                      </div>
+                                      <div className="product-pricing">
+                                        <span className="current-price">{product.price}</span>
+                                        {product.original_price && (
+                                          <span className="original-price">{product.original_price}</span>
+                                        )}
+                                      </div>
+                                      {product.fulfillment?.standard_delivery && (
+                                        <div className="delivery-info">
+                                          {product.fulfillment.standard_delivery.text}
+                                        </div>
+                                      )}
+                                      <div className="product-reason">
+                                        <strong>Why this product:</strong> {product.reason}
+                                      </div>
+                                      <div className="product-actions">
+                                        <a 
+                                          href={product.link} 
+                                          target="_blank" 
+                                          rel="noopener noreferrer"
+                                          className="view-product-button"
+                                        >
+                                          <Eye size={16} />
+                                          View Product
+                                        </a>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                                
+                                {/* Take Me There Button */}
+                                <div className="take-me-there">
+                                  <a 
+                                    href={message.products.takeMeThere} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="take-me-there-button"
+                                  >
+                                    <ExternalLink size={16} />
+                                    View All Results on Amazon
+                                  </a>
+                                </div>
+                              </div>
+                            )}
+                            
+                            <div className="message-timestamp">
+                              {message.timestamp.toLocaleTimeString()}
+                            </div>
+                          </div>
+                        ))
+                      )}
                       
                       {/* Typing Indicator */}
                       {isTyping && (
@@ -635,12 +711,12 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                         onKeyPress={handleKeyPress}
                         placeholder="Ask me anything about products..."
                         className="chat-input"
-                        disabled={isTyping}
+                        disabled={isTyping || isLoadingMessages}
                       />
                       <button
                         className="send-button"
                         onClick={handleSendMessage}
-                        disabled={!inputMessage.trim() || isTyping}
+                        disabled={!inputMessage.trim() || isTyping || isLoadingMessages}
                       >
                         <Send size={18} />
                       </button>
