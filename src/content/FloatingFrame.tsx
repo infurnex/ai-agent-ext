@@ -186,6 +186,9 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
       
       if (image) {
         formData.append('image', image);
+        formData.append("imageAttached", "true");
+      }else{
+        formData.append("imageAttached", "false");
       }
 
       const response = await fetch('http://localhost:5678/webhook/agent', {
@@ -193,6 +196,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
         body: formData
       });
 
+      console.log(response)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
