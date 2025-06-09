@@ -556,6 +556,30 @@ export class FloatingFrameManager {
         border-bottom-left-radius: 4px;
       }
 
+      .message-image {
+        max-width: 80%;
+        margin-top: 8px;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #e5e7eb;
+      }
+
+      .message-image img {
+        width: 100%;
+        height: auto;
+        max-height: 200px;
+        object-fit: cover;
+        display: block;
+      }
+
+      .image-name {
+        padding: 8px 12px;
+        background: #f9fafb;
+        font-size: 12px;
+        color: #6b7280;
+        border-top: 1px solid #e5e7eb;
+      }
+
       .message-timestamp {
         font-size: 11px;
         color: #9ca3af;
@@ -789,6 +813,12 @@ export class FloatingFrameManager {
       .image-upload-button:hover {
         background: #e5e7eb;
         color: #374151;
+      }
+
+      .image-upload-button.has-image {
+        background: #dbeafe;
+        border-color: #2563eb;
+        color: #2563eb;
       }
 
       .chat-input {

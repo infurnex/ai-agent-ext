@@ -48,6 +48,8 @@ interface ChatMessage {
       reason: string;
     }>;
   };
+  imageUrl?: string;
+  imageName?: string;
 }
 
 interface User {
@@ -77,6 +79,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   const [isTyping, setIsTyping] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   
   // Authentication state
   const [user, setUser] = useState<User | null>(null);
@@ -106,7 +109,9 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
         type: message.type,
         content: message.content,
         has_products: message.hasProducts || false,
-        products_data: message.products || null
+        products_data: message.products || null,
+        image_url: message.imageUrl || null,
+        image_name: message.imageName || null
       };
 
       const { error } = await supabase
@@ -145,7 +150,9 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
           content: msg.content,
           timestamp: new Date(msg.created_at),
           hasProducts: msg.has_products || false,
-          products: msg.products_data || undefined
+          products: msg.products_data || undefined,
+          imageUrl: msg.image_url || undefined,
+          imageName: msg.image_name || undefined
         }));
 
         setMessages(loadedMessages);
@@ -169,6 +176,34 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
       setIsLoadingMessages(false);
     }
   }, [saveMessageToSupabase]);
+
+  // Send message to AI agent
+  const sendToAIAgent = useCallback(async (message: string, image: File | null, userId: string) => {
+    try {
+      const formData = new FormData();
+      formData.append('message', message);
+      formData.append('userId', userId);
+      
+      if (image) {
+        formData.append('image', image);
+      }
+
+      const response = await fetch('http://localhost:5678/webhook/agent', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('Error sending to AI agent:', error);
+      throw error;
+    }
+  }, []);
 
   // Initialize component and check auth
   useEffect(() => {
@@ -361,65 +396,56 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
       id: 'user-' + Date.now(),
       type: 'user',
       content: inputMessage,
-      timestamp: new Date()
+      timestamp: new Date(),
+      imageUrl: uploadedImage ? URL.createObjectURL(uploadedImage) : undefined,
+      imageName: uploadedImage?.name
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const currentMessage = inputMessage;
+    const currentImage = uploadedImage;
     setInputMessage('');
+    setUploadedImage(null);
     setIsTyping(true);
 
     // Save user message to Supabase
     await saveMessageToSupabase(userMessage, user.id);
 
-    // Simulate AI response (replace with actual API call)
-    setTimeout(async () => {
-      const mockResponse = {
-        response: "I found some great laptops for you! Here are my top recommendations based on your requirements.",
-        hasProducts: true,
-        products: {
-          takeMeThere: "https://amazon.in/s?k=laptops",
-          selectedProducts: [
-            {
-              asin: "B0CV9VTBKD",
-              title: "MSI Thin15 B12UCX-1693IN Intel Core i7-12650H 12th Gen 39.6cm FHD 144Hz Gaming Laptop (16GB/512GB NVMe SSD/Windows 11 Home/NVIDIA GeForce RTX3050, GDDR6 4GB/Black/1.86Kg)",
-              link: "https://amazon.in/dp/B0CV9VTBKD",
-              rating: "4.5",
-              reviews: "1,234",
-              price: "₹72,799",
-              extracted_price: 72799,
-              original_price: "₹85,999",
-              extracted_original_price: 85999,
-              fulfillment: {
-                standard_delivery: {
-                  text: "FREE delivery Sun, 15 Jun",
-                  type: "FREE delivery",
-                  date: "Sun, 15 Jun"
-                }
-              },
-              is_prime: true,
-              thumbnail: "https://images.pexels.com/photos/205421/pexels-photo-205421.jpeg?auto=compress&cs=tinysrgb&w=300",
-              reason: "This MSI Thin15 laptop is selected due to its high rating (4.5), competitive price (₹72,799), and features like Intel Core i7-12650H processor and NVIDIA GeForce RTX3050 graphics, aligning with the customer's preference for high-rated, cost-effective gaming laptops from reputed brands."
-            }
-          ]
-        }
-      };
-
+    try {
+      // Send to AI agent
+      const aiResponse = await sendToAIAgent(currentMessage, currentImage, user.id);
+      
       const assistantMessage: ChatMessage = {
         id: 'assistant-' + Date.now(),
         type: 'assistant',
-        content: mockResponse.response,
+        content: aiResponse.response || aiResponse.message || 'I received your message and am processing it.',
         timestamp: new Date(),
-        hasProducts: mockResponse.hasProducts,
-        products: mockResponse.products
+        hasProducts: aiResponse.hasProducts || false,
+        products: aiResponse.products || undefined
       };
 
       setMessages(prev => [...prev, assistantMessage]);
-      setIsTyping(false);
-
+      
       // Save assistant message to Supabase
       await saveMessageToSupabase(assistantMessage, user.id);
-    }, 2000);
-  }, [inputMessage, user, saveMessageToSupabase]);
+      
+    } catch (error) {
+      console.error('AI agent request failed:', error);
+      
+      // Fallback response
+      const errorMessage: ChatMessage = {
+        id: 'assistant-' + Date.now(),
+        type: 'assistant',
+        content: 'I apologize, but I\'m having trouble connecting to my AI service right now. Please try again in a moment.',
+        timestamp: new Date()
+      };
+
+      setMessages(prev => [...prev, errorMessage]);
+      await saveMessageToSupabase(errorMessage, user.id);
+    } finally {
+      setIsTyping(false);
+    }
+  }, [inputMessage, uploadedImage, user, saveMessageToSupabase, sendToAIAgent]);
 
   // Handle image upload
   const handleImageUpload = useCallback(() => {
@@ -430,17 +456,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file && file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const imageMessage: ChatMessage = {
-          id: 'image-' + Date.now(),
-          type: 'user',
-          content: `[Image uploaded: ${file.name}]`,
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, imageMessage]);
-      };
-      reader.readAsDataURL(file);
+      setUploadedImage(file);
     }
   }, []);
 
@@ -614,6 +630,16 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                               {message.content}
                             </div>
                             
+                            {/* Image Display */}
+                            {message.imageUrl && (
+                              <div className="message-image">
+                                <img src={message.imageUrl} alt={message.imageName || 'Uploaded image'} />
+                                {message.imageName && (
+                                  <div className="image-name">{message.imageName}</div>
+                                )}
+                              </div>
+                            )}
+                            
                             {/* Product Cards */}
                             {message.hasProducts && message.products && (
                               <div className="products-section">
@@ -705,9 +731,9 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                         style={{ display: 'none' }}
                       />
                       <button
-                        className="image-upload-button"
+                        className={`image-upload-button ${uploadedImage ? 'has-image' : ''}`}
                         onClick={handleImageUpload}
-                        title="Upload image"
+                        title={uploadedImage ? `Image selected: ${uploadedImage.name}` : 'Upload image'}
                       >
                         <Image size={18} />
                       </button>
@@ -716,7 +742,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
                         value={inputMessage}
                         onChange={(e) => setInputMessage(e.target.value)}
                         onKeyPress={handleKeyPress}
-                        placeholder="Ask me anything about products..."
+                        placeholder={uploadedImage ? `Image selected: ${uploadedImage.name}` : "Ask me anything about products..."}
                         className="chat-input"
                         disabled={isTyping || isLoadingMessages}
                       />
