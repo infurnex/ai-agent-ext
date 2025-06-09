@@ -20,6 +20,14 @@ export class FloatingFrameManager {
 
   private async init(): Promise<void> {
     try {
+      // Check authentication before initializing
+      const isAuthenticated = await this.checkAuthentication();
+      
+      if (!isAuthenticated) {
+        console.log('User not authenticated. Floating frame not initialized.');
+        return;
+      }
+
       // Wait for DOM to be ready
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => this.injectFrame());
@@ -31,10 +39,26 @@ export class FloatingFrameManager {
     }
   }
 
+  private async checkAuthentication(): Promise<boolean> {
+    return new Promise((resolve) => {
+      chrome.storage.local.get(['isAuthenticated'], (result) => {
+        resolve(result.isAuthenticated === true);
+      });
+    });
+  }
+
   private async injectFrame(): Promise<void> {
     if (this.isInjected) return;
 
     try {
+      // Double-check authentication before injection
+      const isAuthenticated = await this.checkAuthentication();
+      
+      if (!isAuthenticated) {
+        console.log('Authentication check failed during injection.');
+        return;
+      }
+
       // Create shadow host
       this.shadowHost = document.createElement('div');
       this.shadowHost.id = 'floating-frame-extension-host';
@@ -77,7 +101,7 @@ export class FloatingFrameManager {
       document.body.appendChild(this.shadowHost);
       this.isInjected = true;
 
-      console.log('Floating frame with full functionality injected successfully');
+      console.log('Floating frame with full functionality injected successfully for authenticated user');
     } catch (error) {
       console.error('Failed to inject floating frame:', error);
       this.cleanup();
@@ -86,6 +110,15 @@ export class FloatingFrameManager {
 
   private async handleSearch(query: string): Promise<SearchResult> {
     try {
+      // Check authentication before executing action
+      const isAuthenticated = await this.checkAuthentication();
+      if (!isAuthenticated) {
+        return {
+          success: false,
+          message: 'Authentication required to perform search'
+        };
+      }
+
       console.log('Performing search for:', query);
       const result = await searchAction(query);
       console.log('Search result:', result);
@@ -101,6 +134,16 @@ export class FloatingFrameManager {
 
   private async handleFetchProducts(): Promise<FetchProductsResult> {
     try {
+      // Check authentication before executing action
+      const isAuthenticated = await this.checkAuthentication();
+      if (!isAuthenticated) {
+        return {
+          success: false,
+          message: 'Authentication required to fetch products',
+          count: 0
+        };
+      }
+
       console.log('Fetching products from DOM...');
       const result = await fetchDOMProductsAction();
       console.log('Fetch products result:', result);
@@ -117,6 +160,16 @@ export class FloatingFrameManager {
 
   private async handleFetchLayout(): Promise<FetchLayoutResult> {
     try {
+      // Check authentication before executing action
+      const isAuthenticated = await this.checkAuthentication();
+      if (!isAuthenticated) {
+        return {
+          success: false,
+          message: 'Authentication required to fetch layout',
+          totalElements: 0
+        };
+      }
+
       console.log('Fetching DOM layout structure...');
       const result = await fetchLayoutAction();
       console.log('Fetch layout result:', result);
@@ -133,6 +186,16 @@ export class FloatingFrameManager {
 
   private async handleBuyNow(): Promise<BuyNowResult> {
     try {
+      // Check authentication before executing action
+      const isAuthenticated = await this.checkAuthentication();
+      if (!isAuthenticated) {
+        return {
+          success: false,
+          message: 'Authentication required to perform buy now action',
+          buttonFound: false
+        };
+      }
+
       console.log('Attempting to find and click buy now button...');
       const result = await buyNowAction();
       console.log('Buy now result:', result);
@@ -149,6 +212,19 @@ export class FloatingFrameManager {
 
   private async handleCashOnDelivery(): Promise<CashOnDeliveryResult> {
     try {
+      // Check authentication before executing action
+      const isAuthenticated = await this.checkAuthentication();
+      if (!isAuthenticated) {
+        return {
+          success: false,
+          message: 'Authentication required to select payment method',
+          codOptionFound: false,
+          codOptionSelected: false,
+          continueButtonFound: false,
+          continueButtonClicked: false
+        };
+      }
+
       console.log('Attempting to select Cash on Delivery payment method...');
       const result = await cashOnDeliveryPaymentAction();
       console.log('Cash on Delivery result:', result);
@@ -168,6 +244,17 @@ export class FloatingFrameManager {
 
   private async handlePlaceOrder(): Promise<PlaceOrderResult> {
     try {
+      // Check authentication before executing action
+      const isAuthenticated = await this.checkAuthentication();
+      if (!isAuthenticated) {
+        return {
+          success: false,
+          message: 'Authentication required to place order',
+          buttonFound: false,
+          isOrderReviewPage: false
+        };
+      }
+
       console.log('Attempting to place order...');
       const result = await placeYourOrderAction();
       console.log('Place order result:', result);
@@ -417,6 +504,10 @@ export class FloatingFrameManager {
         padding: 16px;
         margin-bottom: 12px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      }
+
+      .product-card:last-child {
+        border-bottom: none;
       }
 
       .product-image {
@@ -991,7 +1082,7 @@ export class FloatingFrameManager {
     `;
   }
 
-  private removeFrame(): void {
+  public cleanup(): void {
     try {
       if (this.reactRoot) {
         this.reactRoot.unmount();
@@ -1002,17 +1093,17 @@ export class FloatingFrameManager {
         this.shadowHost.parentNode.removeChild(this.shadowHost);
       }
       
-      this.cleanup();
-      console.log('Floating frame removed successfully');
+      this.shadowHost = null;
+      this.shadowRoot = null;
+      this.isInjected = false;
+      
+      console.log('Floating frame cleaned up successfully');
     } catch (error) {
-      console.error('Failed to remove floating frame:', error);
+      console.error('Failed to cleanup floating frame:', error);
     }
   }
 
-  private cleanup(): void {
-    this.shadowHost = null;
-    this.shadowRoot = null;
-    this.reactRoot = null;
-    this.isInjected = false;
+  private removeFrame(): void {
+    this.cleanup();
   }
 }

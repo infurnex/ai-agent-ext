@@ -3,18 +3,66 @@ import { buyNowAction } from "./actions/buyNowAction";
 import { cashOnDeliveryPaymentAction } from "./actions/cashOnDeliveryPaymentAction";
 import { placeYourOrderAction } from "./actions/placeYourOrderAction";
 
-// Initialize the floating frame manager
-if (typeof window !== 'undefined') {
+// Check authentication before initializing
+async function checkAuthentication(): Promise<boolean> {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['isAuthenticated'], (result) => {
+      resolve(result.isAuthenticated === true);
+    });
+  });
+}
+
+// Initialize the floating frame manager only if authenticated
+async function initializeExtension() {
+  const isAuthenticated = await checkAuthentication();
+  
+  if (!isAuthenticated) {
+    console.log('User not authenticated. Extension features disabled.');
+    return;
+  }
+
   // Ensure we only inject once per page
-  if (!window.floatingFrameManager) {
+  if (typeof window !== 'undefined' && !window.floatingFrameManager) {
     window.floatingFrameManager = new FloatingFrameManager();
+    console.log('Extension initialized for authenticated user.');
   }
 }
 
-// Action execution loop
+// Listen for authentication state changes
+chrome.storage.onChanged.addListener((changes, namespace) => {
+  if (namespace === 'local' && changes.isAuthenticated) {
+    if (changes.isAuthenticated.newValue === true) {
+      // User just logged in, initialize extension
+      initializeExtension();
+    } else if (changes.isAuthenticated.newValue === false) {
+      // User logged out, cleanup extension
+      if (window.floatingFrameManager) {
+        // Remove floating frame if it exists
+        try {
+          window.floatingFrameManager.cleanup?.();
+        } catch (error) {
+          console.error('Error cleaning up extension:', error);
+        }
+        window.floatingFrameManager = null;
+      }
+      console.log('User logged out. Extension features disabled.');
+    }
+  }
+});
+
+// Action execution loop - only run if authenticated
 async function executeActionLoop() {
   while (true) {
     try {
+      // Check authentication before executing actions
+      const isAuthenticated = await checkAuthentication();
+      
+      if (!isAuthenticated) {
+        // Wait longer if not authenticated
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        continue;
+      }
+
       // Fetch action from background
       const response = await new Promise<{success: boolean, action: string | null, queueLength: number}>((resolve) => {
         chrome.runtime.sendMessage({
@@ -54,12 +102,15 @@ async function executeActionLoop() {
   }
 }
 
+// Initialize extension on load
+initializeExtension();
+
 // Start action execution loop
 executeActionLoop();
 
 // Make it available globally for debugging
 declare global {
   interface Window {
-    floatingFrameManager: FloatingFrameManager;
+    floatingFrameManager: FloatingFrameManager | null;
   }
 }

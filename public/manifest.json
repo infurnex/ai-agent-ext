@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "Floating Frame Extension",
+  "name": "AI Shopping Assistant",
   "version": "1.0.0",
-  "description": "A beautiful floating frame extension with React",
+  "description": "AI-powered shopping assistant with automated checkout features",
   "permissions": [
     "activeTab",
-    "scripting"
+    "scripting",
+    "storage"
   ],
   "background": {
     "service_worker": "src/background.js"
@@ -28,6 +29,6 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Floating Frame"
+    "default_title": "AI Shopping Assistant"
   }
 }
