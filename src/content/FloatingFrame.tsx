@@ -97,82 +97,23 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load messages from Supabase
-  const loadMessages = useCallback(async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: true });
-
-      if (error) {
-        console.error('Error loading messages:', error);
-        return;
-      }
-
-      const formattedMessages: ChatMessage[] = data.map(msg => ({
-        id: msg.id,
-        type: msg.type as 'user' | 'assistant',
-        content: msg.content,
-        timestamp: new Date(msg.created_at),
-        hasProducts: msg.has_products || false,
-        products: msg.products_data || undefined
-      }));
-
-      setMessages(formattedMessages);
-    } catch (error) {
-      console.error('Failed to load messages:', error);
-    }
-  }, []);
-
-  // Save message to Supabase
-  const saveMessage = useCallback(async (message: ChatMessage, userId: string) => {
-    try {
-      const { error } = await supabase
-        .from('chat_messages')
-        .insert({
-          user_id: userId,
-          type: message.type,
-          content: message.content,
-          has_products: message.hasProducts || false,
-          products_data: message.products || null
-        });
-
-      if (error) {
-        console.error('Error saving message:', error);
-      }
-    } catch (error) {
-      console.error('Failed to save message:', error);
-    }
-  }, []);
-
   // Initialize component and check auth
   useEffect(() => {
     const initializeAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
-          const userData = {
+          setUser({
             id: session.user.id,
             email: session.user.email || ''
-          };
-          setUser(userData);
-          
-          // Load existing messages
-          await loadMessages(session.user.id);
-          
-          // Add welcome message if no messages exist
-          if (messages.length === 0) {
-            const welcomeMessage: ChatMessage = {
-              id: 'welcome-' + Date.now(),
-              type: 'assistant',
-              content: `Welcome back! I'm your AI shopping assistant. I can help you find products, compare prices, and assist with your shopping needs. How can I help you today?`,
-              timestamp: new Date()
-            };
-            setMessages([welcomeMessage]);
-            await saveMessage(welcomeMessage, session.user.id);
-          }
+          });
+          // Add welcome message for authenticated users
+          setMessages([{
+            id: '1',
+            type: 'assistant',
+            content: `Welcome back! I'm your AI shopping assistant. I can help you find products, compare prices, and assist with your shopping needs. How can I help you today?`,
+            timestamp: new Date()
+          }]);
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
@@ -184,17 +125,13 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
     initializeAuth();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
-        const userData = {
+        setUser({
           id: session.user.id,
           email: session.user.email || ''
-        };
-        setUser(userData);
+        });
         setAuthError('');
-        
-        // Load messages for the authenticated user
-        await loadMessages(session.user.id);
       } else {
         setUser(null);
         setMessages([]);
@@ -202,7 +139,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
     });
 
     return () => subscription.unsubscribe();
-  }, [loadMessages, saveMessage]);
+  }, []);
 
   // Auto-scroll chat to bottom
   useEffect(() => {
@@ -254,27 +191,18 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
       if (error) {
         setAuthError(error.message);
       } else if (data.user) {
-        const userData = {
+        setUser({
           id: data.user.id,
           email: data.user.email || ''
-        };
-        setUser(userData);
+        });
         setLoginForm({ email: '', password: '' });
-        
-        // Load existing messages
-        await loadMessages(data.user.id);
-        
-        // Add welcome message if no messages exist
-        const welcomeMessage: ChatMessage = {
-          id: 'welcome-' + Date.now(),
+        // Add welcome message
+        setMessages([{
+          id: '1',
           type: 'assistant',
           content: `Welcome back, ${data.user.email}! I'm your AI shopping assistant. I can help you find products, compare prices, and assist with your shopping needs. How can I help you today?`,
           timestamp: new Date()
-        };
-        setMessages(prev => prev.length === 0 ? [welcomeMessage] : prev);
-        if (messages.length === 0) {
-          await saveMessage(welcomeMessage, data.user.id);
-        }
+        }]);
       }
     } catch (error) {
       setAuthError('Login failed. Please try again.');
@@ -282,7 +210,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
     } finally {
       setIsAuthenticating(false);
     }
-  }, [loginForm, loadMessages, saveMessage, messages.length]);
+  }, [loginForm]);
 
   // Handle logout
   const handleLogout = useCallback(async () => {
@@ -357,7 +285,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
 
   // Handle send message
   const handleSendMessage = useCallback(async () => {
-    if (!inputMessage.trim() || !user) return;
+    if (!inputMessage.trim()) return;
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -366,15 +294,12 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
       timestamp: new Date()
     };
 
-    // Add user message to UI and save to database
     setMessages(prev => [...prev, userMessage]);
-    await saveMessage(userMessage, user.id);
-    
     setInputMessage('');
     setIsTyping(true);
 
     // Simulate AI response (replace with actual API call)
-    setTimeout(async () => {
+    setTimeout(() => {
       const mockResponse = {
         response: "I found some great laptops for you! Here are my top recommendations based on your requirements.",
         hasProducts: true,
@@ -415,12 +340,10 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
         products: mockResponse.products
       };
 
-      // Add assistant message to UI and save to database
       setMessages(prev => [...prev, assistantMessage]);
-      await saveMessage(assistantMessage, user.id);
       setIsTyping(false);
     }, 2000);
-  }, [inputMessage, user, saveMessage]);
+  }, [inputMessage]);
 
   // Handle image upload
   const handleImageUpload = useCallback(() => {
@@ -428,11 +351,11 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
   }, []);
 
   // Handle file selection
-  const handleFileSelect = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file && file.type.startsWith('image/') && user) {
+    if (file && file.type.startsWith('image/')) {
       const reader = new FileReader();
-      reader.onload = async (e) => {
+      reader.onload = (e) => {
         const imageMessage: ChatMessage = {
           id: Date.now().toString(),
           type: 'user',
@@ -440,11 +363,10 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
           timestamp: new Date()
         };
         setMessages(prev => [...prev, imageMessage]);
-        await saveMessage(imageMessage, user.id);
       };
       reader.readAsDataURL(file);
     }
-  }, [user, saveMessage]);
+  }, []);
 
   // Handle key press
   const handleKeyPress = useCallback((event: React.KeyboardEvent) => {
