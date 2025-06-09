@@ -204,7 +204,7 @@ export class FloatingFrameManager {
         position: fixed;
         bottom: 20px;
         left: 20px;
-        width: 320px;
+        width: 380px;
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(20px);
         border-radius: 16px;
@@ -283,39 +283,22 @@ export class FloatingFrameManager {
       }
 
       .floating-frame-content {
-        padding: 20px;
         height: auto;
         max-height: calc(80vh - 60px);
-        overflow-y: auto;
-        scrollbar-width: thin;
-        scrollbar-color: rgba(107, 114, 128, 0.3) transparent;
-      }
-
-      .floating-frame-content::-webkit-scrollbar {
-        width: 6px;
-      }
-
-      .floating-frame-content::-webkit-scrollbar-track {
-        background: transparent;
-      }
-
-      .floating-frame-content::-webkit-scrollbar-thumb {
-        background: rgba(107, 114, 128, 0.3);
-        border-radius: 3px;
-      }
-
-      .floating-frame-content::-webkit-scrollbar-thumb:hover {
-        background: rgba(107, 114, 128, 0.5);
+        overflow: hidden;
       }
 
       .tabs-container {
         width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
       }
 
       .tabs-header {
         display: flex;
         border-bottom: 1px solid #e5e7eb;
-        margin-bottom: 20px;
+        background: #f9fafb;
       }
 
       .tab-button {
@@ -347,15 +330,333 @@ export class FloatingFrameManager {
       }
 
       .tab-content {
-        min-height: 200px;
+        flex: 1;
+        height: calc(80vh - 120px);
+        overflow: hidden;
+      }
+
+      .chat-container {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .chat-messages {
+        flex: 1;
+        padding: 16px;
+        overflow-y: auto;
+        max-height: calc(80vh - 180px);
+        scrollbar-width: thin;
+        scrollbar-color: rgba(107, 114, 128, 0.3) transparent;
+      }
+
+      .chat-messages::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      .chat-messages::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .chat-messages::-webkit-scrollbar-thumb {
+        background: rgba(107, 114, 128, 0.3);
+        border-radius: 3px;
+      }
+
+      .message {
+        margin-bottom: 16px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .message.user {
+        align-items: flex-end;
+      }
+
+      .message.assistant {
+        align-items: flex-start;
+      }
+
+      .message-content {
+        max-width: 80%;
+        padding: 12px 16px;
+        border-radius: 16px;
+        font-size: 14px;
+        line-height: 1.5;
+        word-wrap: break-word;
+      }
+
+      .message.user .message-content {
+        background: #2563eb;
+        color: white;
+        border-bottom-right-radius: 4px;
+      }
+
+      .message.assistant .message-content {
+        background: #f3f4f6;
+        color: #374151;
+        border-bottom-left-radius: 4px;
+      }
+
+      .message-timestamp {
+        font-size: 11px;
+        color: #9ca3af;
+        margin-top: 4px;
+        padding: 0 4px;
+      }
+
+      .products-section {
+        width: 100%;
+        margin-top: 12px;
+      }
+
+      .product-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      }
+
+      .product-image {
+        position: relative;
+        width: 100%;
+        height: 120px;
+        margin-bottom: 12px;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .product-image img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .prime-badge {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        background: #ff9900;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: bold;
+      }
+
+      .product-info {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .product-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #1f2937;
+        line-height: 1.4;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .product-rating {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+      }
+
+      .stars {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: #fbbf24;
+        font-weight: 600;
+      }
+
+      .reviews {
+        color: #6b7280;
+      }
+
+      .product-pricing {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .current-price {
+        font-size: 16px;
+        font-weight: 700;
+        color: #dc2626;
+      }
+
+      .original-price {
+        font-size: 14px;
+        color: #9ca3af;
+        text-decoration: line-through;
+      }
+
+      .delivery-info {
+        font-size: 12px;
+        color: #059669;
+        font-weight: 500;
+      }
+
+      .product-reason {
+        font-size: 12px;
+        color: #6b7280;
+        line-height: 1.4;
+        background: #f9fafb;
+        padding: 8px;
+        border-radius: 6px;
+        border-left: 3px solid #2563eb;
+      }
+
+      .take-me-there {
+        margin-top: 16px;
+        text-align: center;
+      }
+
+      .take-me-there-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 20px;
+        background: #ff9900;
+        color: white;
+        text-decoration: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        transition: all 150ms ease-in-out;
+      }
+
+      .take-me-there-button:hover {
+        background: #e68900;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(255, 153, 0, 0.3);
+      }
+
+      .typing-indicator {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 12px 16px;
+        background: #f3f4f6;
+        border-radius: 16px;
+        border-bottom-left-radius: 4px;
+        max-width: 80px;
+      }
+
+      .typing-indicator span {
+        width: 6px;
+        height: 6px;
+        background: #9ca3af;
+        border-radius: 50%;
+        animation: typing 1.4s infinite ease-in-out;
+      }
+
+      .typing-indicator span:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+
+      .typing-indicator span:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+
+      @keyframes typing {
+        0%, 60%, 100% {
+          transform: translateY(0);
+          opacity: 0.5;
+        }
+        30% {
+          transform: translateY(-10px);
+          opacity: 1;
+        }
+      }
+
+      .chat-input-container {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 16px;
+        border-top: 1px solid #e5e7eb;
+        background: white;
+      }
+
+      .image-upload-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        background: #f3f4f6;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        cursor: pointer;
+        color: #6b7280;
+        transition: all 150ms ease-in-out;
+      }
+
+      .image-upload-button:hover {
+        background: #e5e7eb;
+        color: #374151;
+      }
+
+      .chat-input {
+        flex: 1;
+        padding: 12px 16px;
+        border: 1px solid #d1d5db;
+        border-radius: 20px;
+        font-size: 14px;
+        background: white;
+        color: #374151;
+        outline: none;
+        transition: all 150ms ease-in-out;
+      }
+
+      .chat-input:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      }
+
+      .chat-input:disabled {
+        background: #f9fafb;
+        color: #9ca3af;
+        cursor: not-allowed;
+      }
+
+      .send-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        background: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        transition: all 150ms ease-in-out;
+      }
+
+      .send-button:hover:not(:disabled) {
+        background: #1d4ed8;
+        transform: scale(1.05);
+      }
+
+      .send-button:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+        transform: none;
       }
 
       .content-section {
-        margin-bottom: 24px;
-      }
-
-      .content-section:last-child {
-        margin-bottom: 0;
+        padding: 20px;
       }
 
       .section-title {
@@ -371,52 +672,6 @@ export class FloatingFrameManager {
         color: #6b7280;
         line-height: 1.6;
         margin-bottom: 16px;
-      }
-
-      .action-buttons {
-        display: flex;
-        gap: 12px;
-        flex-wrap: wrap;
-      }
-
-      .primary-button {
-        flex: 1;
-        min-width: 120px;
-        padding: 12px 16px;
-        background: #2563eb;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        font-weight: 600;
-        font-size: 14px;
-        cursor: pointer;
-        transition: all 150ms ease-in-out;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-      }
-
-      .primary-button:hover:not(:disabled) {
-        background: #1d4ed8;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3);
-      }
-
-      .primary-button:disabled {
-        background: #9ca3af;
-        cursor: not-allowed;
-        transform: none;
-        box-shadow: none;
-      }
-
-      .append-queue-button {
-        background: #8b5cf6;
-      }
-
-      .append-queue-button:hover:not(:disabled) {
-        background: #7c3aed;
-        box-shadow: 0 4px 8px rgba(139, 92, 246, 0.3);
       }
 
       .settings-list {
@@ -481,22 +736,22 @@ export class FloatingFrameManager {
       @media (max-width: 768px) {
         .floating-frame {
           width: calc(100vw - 40px);
-          max-width: 320px;
+          max-width: 380px;
           bottom: 10px;
           left: 20px;
         }
         
-        .action-buttons {
-          flex-direction: column;
-        }
-        
-        .primary-button {
-          min-width: unset;
-        }
-
         .tab-button {
           font-size: 12px;
           padding: 10px 12px;
+        }
+
+        .product-card {
+          padding: 12px;
+        }
+
+        .product-image {
+          height: 100px;
         }
       }
 
