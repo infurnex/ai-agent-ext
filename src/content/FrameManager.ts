@@ -245,11 +245,16 @@ export class FloatingFrameManager {
         color: #374151;
         font-weight: 500;
         font-size: 14px;
+        flex: 1;
+        overflow: hidden;
       }
 
       .header-title {
         font-weight: 600;
         color: #1f2937;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .header-controls {
@@ -288,6 +293,138 @@ export class FloatingFrameManager {
         overflow: hidden;
       }
 
+      /* Login Styles */
+      .login-container {
+        padding: 32px 24px;
+        text-align: center;
+        height: calc(80vh - 60px);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        max-height: 500px;
+      }
+
+      .login-header {
+        margin-bottom: 32px;
+      }
+
+      .login-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 64px;
+        height: 64px;
+        background: rgba(37, 99, 235, 0.1);
+        border-radius: 16px;
+        color: #2563eb;
+        margin: 0 auto 16px;
+      }
+
+      .login-title {
+        font-size: 24px;
+        font-weight: 700;
+        color: #1f2937;
+        margin-bottom: 8px;
+      }
+
+      .login-subtitle {
+        font-size: 14px;
+        color: #6b7280;
+        line-height: 1.5;
+      }
+
+      .login-form {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        margin-bottom: 24px;
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        text-align: left;
+      }
+
+      .form-label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #374151;
+      }
+
+      .form-input {
+        padding: 12px 16px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 14px;
+        background: white;
+        color: #374151;
+        transition: all 150ms ease-in-out;
+      }
+
+      .form-input:focus {
+        outline: none;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      }
+
+      .form-input:disabled {
+        background: #f9fafb;
+        color: #9ca3af;
+        cursor: not-allowed;
+      }
+
+      .auth-error {
+        padding: 12px 16px;
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.2);
+        border-radius: 8px;
+        color: #dc2626;
+        font-size: 14px;
+        text-align: center;
+      }
+
+      .login-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 14px 20px;
+        background: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 16px;
+        cursor: pointer;
+        transition: all 150ms ease-in-out;
+      }
+
+      .login-button:hover:not(:disabled) {
+        background: #1d4ed8;
+        transform: translateY(-1px);
+        box-shadow: 0 8px 16px rgba(37, 99, 235, 0.3);
+      }
+
+      .login-button:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .login-footer {
+        margin-top: auto;
+      }
+
+      .login-help {
+        font-size: 12px;
+        color: #9ca3af;
+        line-height: 1.4;
+      }
+
+      /* Tabs and existing styles remain the same */
       .tabs-container {
         width: 100%;
         height: 100%;
@@ -909,7 +1046,7 @@ export class FloatingFrameManager {
         position: fixed;
         bottom: 20px;
         left: 20px;
-        width: 60px;
+        width:  60px;
         height: 60px;
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(20px);
@@ -979,6 +1116,19 @@ export class FloatingFrameManager {
 
         .option-description {
           font-size: 12px;
+        }
+
+        .login-container {
+          padding: 24px 20px;
+        }
+
+        .login-title {
+          font-size: 20px;
+        }
+
+        .login-icon {
+          width: 56px;
+          height: 56px;
         }
       }
 
