@@ -6,13 +6,13 @@ export class FloatingFrameManager {
   private shadowHost: HTMLDivElement | null = null;
   private shadowRoot: ShadowRoot | null = null;
   private reactRoot: any = null;
-  private isInjected = false;
+  public isInjected = false;
 
   constructor() {
     this.init();
   }
 
-  private async init(): Promise<void> {
+  public async init(): Promise<void> {
     try {
       // Wait for DOM to be ready
       if (document.readyState === 'loading') {
@@ -69,6 +69,24 @@ export class FloatingFrameManager {
     } catch (error) {
       console.error('Failed to inject floating frame:', error);
       this.cleanup();
+    }
+  }
+
+  public removeFrame(): void {
+    try {
+      if (this.reactRoot) {
+        this.reactRoot.unmount();
+        this.reactRoot = null;
+      }
+      
+      if (this.shadowHost && this.shadowHost.parentNode) {
+        this.shadowHost.parentNode.removeChild(this.shadowHost);
+      }
+      
+      this.cleanup();
+      console.log('Floating frame removed successfully');
+    } catch (error) {
+      console.error('Failed to remove floating frame:', error);
     }
   }
 
@@ -1131,24 +1149,6 @@ export class FloatingFrameManager {
         }
       }
     `;
-  }
-
-  private removeFrame(): void {
-    try {
-      if (this.reactRoot) {
-        this.reactRoot.unmount();
-        this.reactRoot = null;
-      }
-      
-      if (this.shadowHost && this.shadowHost.parentNode) {
-        this.shadowHost.parentNode.removeChild(this.shadowHost);
-      }
-      
-      this.cleanup();
-      console.log('Floating frame removed successfully');
-    } catch (error) {
-      console.error('Failed to remove floating frame:', error);
-    }
   }
 
   private cleanup(): void {

@@ -1,9 +1,23 @@
 import { FloatingFrameManager } from "./FrameManager";
 import { selectAndClickAction } from "./actions/selectAndClickAction";
 
+// Extension state
+let extensionEnabled = true;
+
 // Check if we're on Amazon
 function isAmazonWebsite(): boolean {
   return window.location.hostname.includes('amazon');
+}
+
+// Load extension state from storage
+async function loadExtensionState(): Promise<void> {
+  try {
+    const result = await chrome.storage.local.get(['extensionEnabled']);
+    extensionEnabled = result.extensionEnabled !== false; // Default to true
+  } catch (error) {
+    console.error('Failed to load extension state:', error);
+    extensionEnabled = true; // Default fallback
+  }
 }
 
 // Wait for DOM and page content to fully load
@@ -54,6 +68,12 @@ async function clearActionQueue(): Promise<void> {
 async function executeActionLoop() {
   while (true) {
     try {
+      // Check if extension is enabled
+      if (!extensionEnabled) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        continue;
+      }
+
       // Only execute actions on Amazon websites
       if (!isAmazonWebsite()) {
         await new Promise(resolve => setTimeout(resolve, 5000));
@@ -190,16 +210,48 @@ function showActionNotification(actionName: string, result: any) {
   }, 5000);
 }
 
-// Start action execution loop FIRST
-executeActionLoop();
+// Listen for extension state changes
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type === 'EXTENSION_STATE_CHANGED') {
+    extensionEnabled = request.enabled;
+    console.log('Extension state changed:', extensionEnabled ? 'enabled' : 'disabled');
+    
+    // Update floating frame visibility based on state
+    if (window.floatingFrameManager) {
+      if (extensionEnabled) {
+        // Re-inject frame if it was removed
+        if (!window.floatingFrameManager.isInjected) {
+          window.floatingFrameManager.init();
+        }
+      } else {
+        // Remove frame when disabled
+        window.floatingFrameManager.removeFrame();
+      }
+    }
+    
+    sendResponse({ success: true });
+  }
+});
 
-// Initialize the floating frame manager AFTER execution loop
-if (typeof window !== 'undefined') {
-  // Ensure we only inject once per page
-  if (!window.floatingFrameManager) {
-    window.floatingFrameManager = new FloatingFrameManager();
+// Initialize extension
+async function initializeExtension() {
+  // Load extension state first
+  await loadExtensionState();
+  
+  // Start action execution loop FIRST
+  executeActionLoop();
+
+  // Initialize the floating frame manager AFTER execution loop (only if enabled)
+  if (typeof window !== 'undefined' && extensionEnabled) {
+    // Ensure we only inject once per page
+    if (!window.floatingFrameManager) {
+      window.floatingFrameManager = new FloatingFrameManager();
+    }
   }
 }
+
+// Start initialization
+initializeExtension();
 
 // Make it available globally for debugging
 declare global {
