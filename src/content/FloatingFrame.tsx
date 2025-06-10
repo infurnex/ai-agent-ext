@@ -51,7 +51,7 @@ const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1N
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose }) => {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false); // Changed to false for collapsed default
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'chat' | 'checkout'>('chat');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
