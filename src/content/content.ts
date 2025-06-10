@@ -1,14 +1,6 @@
 import { FloatingFrameManager } from "./FrameManager";
 import { selectAndClickAction } from "./actions/selectAndClickAction";
 
-// Initialize the floating frame manager
-if (typeof window !== 'undefined') {
-  // Ensure we only inject once per page
-  if (!window.floatingFrameManager) {
-    window.floatingFrameManager = new FloatingFrameManager();
-  }
-}
-
 // Check if we're on Amazon
 function isAmazonWebsite(): boolean {
   return window.location.hostname.includes('amazon');
@@ -198,8 +190,16 @@ function showActionNotification(actionName: string, result: any) {
   }, 5000);
 }
 
-// Start action execution loop
+// Start action execution loop FIRST
 executeActionLoop();
+
+// Initialize the floating frame manager AFTER execution loop
+if (typeof window !== 'undefined') {
+  // Ensure we only inject once per page
+  if (!window.floatingFrameManager) {
+    window.floatingFrameManager = new FloatingFrameManager();
+  }
+}
 
 // Make it available globally for debugging
 declare global {
