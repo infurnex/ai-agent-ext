@@ -14,6 +14,30 @@ function isAmazonWebsite(): boolean {
   return window.location.hostname.includes('amazon');
 }
 
+// Wait for DOM and page content to fully load
+async function waitForPageLoad(): Promise<void> {
+  return new Promise((resolve) => {
+    // If document is already loaded
+    if (document.readyState === 'complete') {
+      // Additional wait for dynamic content
+      setTimeout(resolve, 1000);
+      return;
+    }
+
+    // Wait for document to be ready
+    const checkReady = () => {
+      if (document.readyState === 'complete') {
+        // Additional wait for dynamic content and scripts
+        setTimeout(resolve, 1000);
+      } else {
+        setTimeout(checkReady, 100);
+      }
+    };
+
+    checkReady();
+  });
+}
+
 // Clear action queue function
 async function clearActionQueue(): Promise<void> {
   try {
@@ -54,6 +78,11 @@ async function executeActionLoop() {
       if (response.success && response.action) {
         const actionData = response.action;
         console.log(`Executing action on Amazon:`, actionData);
+        
+        // Wait for DOM/page content to fully load before performing action
+        console.log('Waiting for page to fully load...');
+        await waitForPageLoad();
+        console.log('Page loaded, proceeding with action...');
         
         let result;
         
