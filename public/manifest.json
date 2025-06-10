@@ -1,12 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "AI Shopping Assistant",
+  "name": "Floating Frame Extension",
   "version": "1.0.0",
-  "description": "Smart automation and AI assistance for Amazon shopping",
+  "description": "A beautiful floating frame extension with React",
   "permissions": [
     "activeTab",
-    "scripting",
-    "storage"
+    "scripting"
   ],
   "background": {
     "service_worker": "src/background.js"
@@ -65,6 +64,6 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "AI Shopping Assistant"
+    "default_title": "Floating Frame"
   }
 }

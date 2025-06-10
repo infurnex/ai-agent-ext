@@ -1,24 +1,9 @@
 import { FloatingFrameManager } from "./FrameManager";
 import { selectAndClickAction } from "./actions/selectAndClickAction";
 
-// Extension state
-let isExtensionEnabled = true;
-let floatingFrameManager: FloatingFrameManager | null = null;
-
 // Check if we're on Amazon
 function isAmazonWebsite(): boolean {
   return window.location.hostname.includes('amazon');
-}
-
-// Check extension enabled state
-async function checkExtensionState(): Promise<boolean> {
-  try {
-    const result = await chrome.storage.local.get(['extensionEnabled']);
-    return result.extensionEnabled !== false; // Default to true
-  } catch (error) {
-    console.error('Failed to check extension state:', error);
-    return true; // Default to enabled on error
-  }
 }
 
 // Wait for DOM and page content to fully load
@@ -69,13 +54,6 @@ async function clearActionQueue(): Promise<void> {
 async function executeActionLoop() {
   while (true) {
     try {
-      // Check if extension is enabled
-      const extensionEnabled = await checkExtensionState();
-      if (!extensionEnabled) {
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        continue;
-      }
-
       // Only execute actions on Amazon websites
       if (!isAmazonWebsite()) {
         await new Promise(resolve => setTimeout(resolve, 5000));
@@ -140,25 +118,6 @@ async function executeActionLoop() {
       // Wait before retrying on error
       await new Promise(resolve => setTimeout(resolve, 5000));
     }
-  }
-}
-
-// Initialize floating frame
-async function initializeFloatingFrame() {
-  const extensionEnabled = await checkExtensionState();
-  
-  if (extensionEnabled && !floatingFrameManager) {
-    floatingFrameManager = new FloatingFrameManager();
-    console.log('Floating frame initialized');
-  }
-}
-
-// Remove floating frame
-function removeFloatingFrame() {
-  if (floatingFrameManager) {
-    // The frame manager should have a cleanup method
-    floatingFrameManager = null;
-    console.log('Floating frame removed');
   }
 }
 
@@ -231,36 +190,14 @@ function showActionNotification(actionName: string, result: any) {
   }, 5000);
 }
 
-// Listen for extension state changes from popup
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.type === 'EXTENSION_STATE_CHANGED') {
-    isExtensionEnabled = request.enabled;
-    
-    if (isExtensionEnabled) {
-      // Extension was enabled, initialize floating frame
-      initializeFloatingFrame();
-    } else {
-      // Extension was disabled, remove floating frame and clear queue
-      removeFloatingFrame();
-      clearActionQueue();
-    }
-    
-    sendResponse({ success: true });
-  }
-});
-
 // Start action execution loop FIRST
 executeActionLoop();
 
-// Initialize the floating frame manager AFTER execution loop (only if enabled)
+// Initialize the floating frame manager AFTER execution loop
 if (typeof window !== 'undefined') {
-  // Ensure we only inject once per page and only if extension is enabled
+  // Ensure we only inject once per page
   if (!window.floatingFrameManager) {
-    initializeFloatingFrame().then(() => {
-      if (floatingFrameManager) {
-        window.floatingFrameManager = floatingFrameManager;
-      }
-    });
+    window.floatingFrameManager = new FloatingFrameManager();
   }
 }
 
