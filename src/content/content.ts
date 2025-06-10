@@ -124,7 +124,7 @@ async function executeActionLoop() {
 // Show action notification
 function showActionNotification(actionName: string, result: any) {
   const message = result.success ? 
-    `✅ ${actionName}: ${result.message}` : 
+    `✅ ${actionName}` : 
     `❌ ${actionName}: ${result.message}`;
   
   // Create notification element
