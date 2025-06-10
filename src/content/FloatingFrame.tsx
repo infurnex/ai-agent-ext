@@ -1,21 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { X, Minimize2, Maximize2, MessageCircle, ShoppingCart, Send, Image, Star, ExternalLink, Eye, CreditCard, Package, CheckCircle, LogIn, User, AlertCircle } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
-import { SearchResult } from './actions/searchAction';
-import { FetchProductsResult, Product } from './actions/fetchDOMProductsAction';
-import { FetchLayoutResult, LayoutElement } from './actions/fetchLayoutAction';
-import { BuyNowResult } from './actions/buyNowAction';
-import { CashOnDeliveryResult } from './actions/cashOnDeliveryPaymentAction';
-import { PlaceOrderResult } from './actions/placeYourOrderAction';
 
 interface FloatingFrameProps {
   onClose?: () => void;
-  onSearch?: (query: string) => Promise<SearchResult>;
-  onFetchProducts?: () => Promise<FetchProductsResult>;
-  onFetchLayout?: () => Promise<FetchLayoutResult>;
-  onBuyNow?: () => Promise<BuyNowResult>;
-  onCashOnDelivery?: () => Promise<CashOnDeliveryResult>;
-  onPlaceOrder?: () => Promise<PlaceOrderResult>;
 }
 
 interface ChatMessage {
@@ -62,15 +50,7 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://hmwchcxvaweffi
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhtd2NoY3h2YXdlZmZpanpzdGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0NTg0ODAsImV4cCI6MjA2NTAzNDQ4MH0.LiC_-lMYV6erflw8bRqBystXhklMG8PpCOgthiFQ-Qk';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ 
-  onClose, 
-  onSearch, 
-  onFetchProducts, 
-  onFetchLayout, 
-  onBuyNow,
-  onCashOnDelivery,
-  onPlaceOrder
-}) => {
+const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'chat' | 'checkout'>('chat');
@@ -354,11 +334,38 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
       return;
     }
 
-    const selectedActions: string[] = [];
+    const selectedActions: any[] = [];
     
-    if (checkoutOptions.buyNow) selectedActions.push('buy_now');
-    if (checkoutOptions.paymentMethod === 'cash_on_delivery') selectedActions.push('cash_on_delivery');
-    if (checkoutOptions.placeOrder) selectedActions.push('place_order');
+    if (checkoutOptions.buyNow) {
+      selectedActions.push({
+        action: "buy now",
+        tag: "input",
+        attributes: { "id": "buy-now-button", "type": "submit" }
+      });
+    }
+    
+    if (checkoutOptions.paymentMethod === 'cash_on_delivery') {
+      selectedActions.push(
+        {
+          action: "selecting cod option",
+          tag: "input",
+          attributes: { "id": "pp-kiqJYZ-300", "type": "radio" }
+        },
+        {
+          action: "confirming payment option",
+          tag: "input",
+          attributes: { "type": "submit", "aria-labelledby": "checkout-primary-continue-button-id-announce" }
+        }
+      );
+    }
+    
+    if (checkoutOptions.placeOrder) {
+      selectedActions.push({
+        action: "placing order",
+        tag: "input",
+        attributes: { "type": "submit", "id": "placeOrder" }
+      });
+    }
 
     if (selectedActions.length === 0) {
       alert('Please select at least one action to automate.');
@@ -366,13 +373,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
     }
 
     // Show confirmation dialog
-    const actionNames = {
-      'buy_now': 'Buy Now',
-      'cash_on_delivery': 'Cash on Delivery',
-      'place_order': 'Place Order'
-    };
-
-    const actionList = selectedActions.map(action => actionNames[action as keyof typeof actionNames]).join(', ');
+    const actionList = selectedActions.map(action => action.action).join(', ');
     
     const confirmCheckout = confirm(
       `🛒 Quick Checkout Automation\n\n` +
@@ -405,17 +406,17 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
               }
               
               if (response?.success) {
-                console.log(`Action ${action} added to queue successfully`);
+                console.log(`Action ${action.action} added to queue successfully`);
                 successCount++;
                 resolve();
               } else {
-                console.error(`Failed to add action ${action}:`, response?.error);
+                console.error(`Failed to add action ${action.action}:`, response?.error);
                 reject(new Error(response?.error || 'Unknown error'));
               }
             });
           });
         } catch (error) {
-          console.error(`Failed to queue action ${action}:`, error);
+          console.error(`Failed to queue action ${action.action}:`, error);
         }
       }
 
@@ -423,7 +424,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({
         alert(
           `✅ Success!\n\n` +
           `${successCount} action(s) have been queued for automation:\n` +
-          `${selectedActions.slice(0, successCount).map(action => actionNames[action as keyof typeof actionNames]).join(', ')}\n\n` +
+          `${selectedActions.slice(0, successCount).map(action => action.action).join(', ')}\n\n` +
           `Actions will execute automatically when you navigate to the appropriate Amazon pages.\n\n` +
           `Watch for notifications in the top-right corner of the page.`
         );

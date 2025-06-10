@@ -1,16 +1,16 @@
 // Action queue to store pending actions
-let actionQueue: string[] = [];
+let actionQueue: any[] = [];
 
 // Listener 1: Append actions to action queue
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'APPEND_ACTION') {
     const { action } = request;
     
-    if (typeof action === 'string') {
+    if (action && typeof action === 'object') {
       actionQueue.push(action);
       sendResponse({ success: true, queueLength: actionQueue.length });
     } else {
-      sendResponse({ success: false, error: 'Action must be a string' });
+      sendResponse({ success: false, error: 'Action must be an object' });
     }
     
     return true; // Keep message channel open for async response

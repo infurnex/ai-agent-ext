@@ -1,7 +1,5 @@
 import { FloatingFrameManager } from "./FrameManager";
-import { buyNowAction } from "./actions/buyNowAction";
-import { cashOnDeliveryPaymentAction } from "./actions/cashOnDeliveryPaymentAction";
-import { placeYourOrderAction } from "./actions/placeYourOrderAction";
+import { selectAndClickAction } from "./actions/selectAndClickAction";
 
 // Initialize the floating frame manager
 if (typeof window !== 'undefined') {
@@ -27,38 +25,31 @@ async function executeActionLoop() {
       }
 
       // Fetch action from background
-      const response = await new Promise<{success: boolean, action: string | null, queueLength: number}>((resolve) => {
+      const response = await new Promise<{success: boolean, action: any | null, queueLength: number}>((resolve) => {
         chrome.runtime.sendMessage({
           type: 'POP_ACTION'
         }, resolve);
       });
 
       if (response.success && response.action) {
-        console.log(`Executing action on Amazon: ${response.action}`);
+        const actionData = response.action;
+        console.log(`Executing action on Amazon:`, actionData);
         
         let result;
         
-        // Perform action based on type
-        switch (response.action) {
-          case 'buy_now':
-            result = await buyNowAction();
-            console.log('Buy Now Action Result:', result);
-            break;
-          case 'cash_on_delivery':
-            result = await cashOnDeliveryPaymentAction();
-            console.log('Cash on Delivery Action Result:', result);
-            break;
-          case 'place_order':
-            result = await placeYourOrderAction();
-            console.log('Place Order Action Result:', result);
-            break;
-          default:
-            console.warn(`Unknown action: ${response.action}`);
-        }
-        
-        // Show result notification
-        if (result) {
-          showActionNotification(response.action, result);
+        // Execute selectAndClickAction with the provided parameters
+        if (actionData.tag && actionData.attributes) {
+          result = await selectAndClickAction({
+            tag: actionData.tag,
+            attributes: actionData.attributes
+          });
+          
+          console.log(`${actionData.action} Result:`, result);
+          
+          // Show result notification
+          showActionNotification(actionData.action, result);
+        } else {
+          console.warn(`Invalid action format:`, actionData);
         }
         
         // Small delay between actions
@@ -76,14 +67,7 @@ async function executeActionLoop() {
 }
 
 // Show action notification
-function showActionNotification(action: string, result: any) {
-  const actionNames = {
-    'buy_now': 'Buy Now',
-    'cash_on_delivery': 'Cash on Delivery',
-    'place_order': 'Place Order'
-  };
-  
-  const actionName = actionNames[action as keyof typeof actionNames] || action;
+function showActionNotification(actionName: string, result: any) {
   const message = result.success ? 
     `✅ ${actionName}: ${result.message}` : 
     `❌ ${actionName}: ${result.message}`;
