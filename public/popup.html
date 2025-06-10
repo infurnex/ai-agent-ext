@@ -297,28 +297,6 @@
             color: #64748b;
         }
 
-        .loading {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            color: #64748b;
-        }
-
-        .spinner {
-            width: 16px;
-            height: 16px;
-            border: 2px solid #e2e8f0;
-            border-top: 2px solid #667eea;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
         .disabled-overlay {
             opacity: 0.6;
             pointer-events: none;
@@ -346,25 +324,17 @@
             <div class="status-section">
                 <div class="status-header">
                     <div class="status-info">
-                        <div class="status-icon" id="statusIcon">
-                            <div class="loading" id="loadingIndicator">
-                                <div class="spinner"></div>
-                            </div>
-                            <svg id="enabledIcon" style="display: none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <div class="status-icon enabled" id="statusIcon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <polyline points="20,6 9,17 4,12"/>
-                            </svg>
-                            <svg id="disabledIcon" style="display: none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="10"/>
-                                <line x1="15" y1="9" x2="9" y2="15"/>
-                                <line x1="9" y1="9" x2="15" y2="15"/>
                             </svg>
                         </div>
                         <div class="status-text">
-                            <div class="status-title" id="statusTitle">Loading...</div>
-                            <div class="status-description" id="statusDescription">Checking extension status...</div>
+                            <div class="status-title" id="statusTitle">Extension Enabled</div>
+                            <div class="status-description" id="statusDescription">AI Shopping Assistant is active on Amazon websites</div>
                         </div>
                     </div>
-                    <button class="toggle-switch" id="toggleSwitch" disabled>
+                    <button class="toggle-switch enabled" id="toggleSwitch">
                     </button>
                 </div>
             </div>
@@ -474,36 +444,27 @@
         const statusIcon = document.getElementById('statusIcon');
         const statusTitle = document.getElementById('statusTitle');
         const statusDescription = document.getElementById('statusDescription');
-        const loadingIndicator = document.getElementById('loadingIndicator');
-        const enabledIcon = document.getElementById('enabledIcon');
-        const disabledIcon = document.getElementById('disabledIcon');
 
-        // Initialize popup
-        async function initializePopup() {
-            try {
-                // Get current extension state from storage
-                const result = await chrome.storage.local.get(['extensionEnabled']);
+        // Initialize popup - simplified version
+        function initializePopup() {
+            // Get current extension state from storage
+            chrome.storage.local.get(['extensionEnabled'], (result) => {
                 isExtensionEnabled = result.extensionEnabled !== false; // Default to true
-                
                 updateUI();
-                toggleSwitch.disabled = false;
-            } catch (error) {
-                console.error('Failed to initialize popup:', error);
-                showError();
-            }
+            });
         }
 
         // Update UI based on extension state
         function updateUI() {
-            // Hide loading indicator
-            loadingIndicator.style.display = 'none';
-            
             if (isExtensionEnabled) {
                 // Extension is enabled
                 statusIcon.classList.remove('disabled');
                 statusIcon.classList.add('enabled');
-                enabledIcon.style.display = 'block';
-                disabledIcon.style.display = 'none';
+                statusIcon.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20,6 9,17 4,12"/>
+                    </svg>
+                `;
                 
                 statusTitle.textContent = 'Extension Enabled';
                 statusDescription.textContent = 'AI Shopping Assistant is active on Amazon websites';
@@ -516,8 +477,13 @@
                 // Extension is disabled
                 statusIcon.classList.remove('enabled');
                 statusIcon.classList.add('disabled');
-                enabledIcon.style.display = 'none';
-                disabledIcon.style.display = 'block';
+                statusIcon.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="15" y1="9" x2="9" y2="15"/>
+                        <line x1="9" y1="9" x2="15" y2="15"/>
+                    </svg>
+                `;
                 
                 statusTitle.textContent = 'Extension Disabled';
                 statusDescription.textContent = 'AI Shopping Assistant is inactive';
@@ -529,29 +495,17 @@
             }
         }
 
-        // Show error state
-        function showError() {
-            loadingIndicator.style.display = 'none';
-            statusIcon.classList.add('disabled');
-            disabledIcon.style.display = 'block';
-            statusTitle.textContent = 'Error';
-            statusDescription.textContent = 'Failed to load extension status';
-            toggleSwitch.disabled = true;
-        }
-
         // Toggle extension state
-        async function toggleExtension() {
-            try {
-                isExtensionEnabled = !isExtensionEnabled;
-                
-                // Save state to storage
-                await chrome.storage.local.set({ extensionEnabled: isExtensionEnabled });
-                
+        function toggleExtension() {
+            isExtensionEnabled = !isExtensionEnabled;
+            
+            // Save state to storage
+            chrome.storage.local.set({ extensionEnabled: isExtensionEnabled }, () => {
                 // Update UI immediately
                 updateUI();
                 
                 // Notify all Amazon tabs about the state change
-                const tabs = await chrome.tabs.query({
+                chrome.tabs.query({
                     url: [
                         "*://*.amazon.com/*",
                         "*://*.amazon.co.uk/*",
@@ -571,36 +525,25 @@
                         "*://*.amazon.ae/*",
                         "*://*.amazon.sa/*"
                     ]
-                });
-                
-                // Send message to content scripts to update their state
-                for (const tab of tabs) {
-                    try {
-                        await chrome.tabs.sendMessage(tab.id, {
+                }, (tabs) => {
+                    // Send message to content scripts to update their state
+                    tabs.forEach((tab) => {
+                        chrome.tabs.sendMessage(tab.id, {
                             type: 'EXTENSION_STATE_CHANGED',
                             enabled: isExtensionEnabled
+                        }).catch(() => {
+                            // Tab might not have content script loaded, ignore error
                         });
-                    } catch (error) {
-                        // Tab might not have content script loaded, ignore error
-                        console.log('Could not send message to tab:', tab.id);
-                    }
-                }
+                    });
+                });
                 
                 // If disabling, clear any pending actions
                 if (!isExtensionEnabled) {
-                    try {
-                        await chrome.runtime.sendMessage({ type: 'CLEAR_QUEUE' });
-                    } catch (error) {
-                        console.log('Could not clear queue:', error);
-                    }
+                    chrome.runtime.sendMessage({ type: 'CLEAR_QUEUE' }).catch(() => {
+                        // Background script might not be ready, ignore error
+                    });
                 }
-                
-            } catch (error) {
-                console.error('Failed to toggle extension:', error);
-                // Revert state on error
-                isExtensionEnabled = !isExtensionEnabled;
-                updateUI();
-            }
+            });
         }
 
         // Event listeners
