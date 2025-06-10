@@ -349,7 +349,7 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose }) => {
         {
           action: "selecting cod option",
           tag: "input",
-          attributes: { "id": "pp-kiqJYZ-300", "type": "radio" }
+          attributes: { "value": "instrumentId=0h_PE_CUS_18b1c868-2e63-40e2-8b24-414fe05d88c8%2FCash&isExpired=false&paymentMethod=COD&tfxEligible=false", "type": "radio" }
         },
         {
           action: "confirming payment option",
