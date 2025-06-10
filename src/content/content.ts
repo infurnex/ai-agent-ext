@@ -14,6 +14,26 @@ function isAmazonWebsite(): boolean {
   return window.location.hostname.includes('amazon');
 }
 
+// Clear action queue function
+async function clearActionQueue(): Promise<void> {
+  try {
+    await new Promise<void>((resolve) => {
+      chrome.runtime.sendMessage({
+        type: 'CLEAR_QUEUE'
+      }, (response) => {
+        if (response?.success) {
+          console.log('Action queue cleared:', response.message);
+        } else {
+          console.error('Failed to clear queue:', response?.error);
+        }
+        resolve();
+      });
+    });
+  } catch (error) {
+    console.error('Error clearing queue:', error);
+  }
+}
+
 // Action execution loop
 async function executeActionLoop() {
   while (true) {
@@ -46,10 +66,22 @@ async function executeActionLoop() {
           
           console.log(`${actionData.action} Result:`, result);
           
+          // If action failed, clear the queue to prevent further actions
+          if (!result.success) {
+            console.warn(`Action "${actionData.action}" failed. Clearing remaining actions from queue.`);
+            await clearActionQueue();
+            showActionNotification(actionData.action, result);
+            // Continue the loop but queue is now empty
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            continue;
+          }
+          
           // Show result notification
           showActionNotification(actionData.action, result);
         } else {
           console.warn(`Invalid action format:`, actionData);
+          // Clear queue on invalid action format
+          await clearActionQueue();
         }
         
         // Small delay between actions
@@ -60,6 +92,8 @@ async function executeActionLoop() {
       }
     } catch (error) {
       console.error('Action execution error:', error);
+      // Clear queue on execution error
+      await clearActionQueue();
       // Wait before retrying on error
       await new Promise(resolve => setTimeout(resolve, 5000));
     }

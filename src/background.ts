@@ -31,3 +31,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // Keep message channel open for async response
   }
 });
+
+// Listener 3: Clear/empty the entire action queue
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type === 'CLEAR_QUEUE') {
+    const previousLength = actionQueue.length;
+    actionQueue = []; // Clear the entire queue
+    
+    sendResponse({ 
+      success: true, 
+      message: `Queue cleared. Removed ${previousLength} action(s).`,
+      previousLength: previousLength,
+      queueLength: 0 
+    });
+    
+    return true; // Keep message channel open for async response
+  }
+});
