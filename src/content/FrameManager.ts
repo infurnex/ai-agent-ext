@@ -1,12 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import FloatingFrame from './FloatingFrame';
-import { searchAction, SearchResult } from './actions/searchAction';
-import { fetchDOMProductsAction, FetchProductsResult } from './actions/fetchDOMProductsAction';
-import { fetchLayoutAction, FetchLayoutResult } from './actions/fetchLayoutAction';
-import { buyNowAction, BuyNowResult } from './actions/buyNowAction';
-import { cashOnDeliveryPaymentAction, CashOnDeliveryResult } from './actions/cashOnDeliveryPaymentAction';
-import { placeYourOrderAction, PlaceOrderResult } from './actions/placeYourOrderAction';
 
 export class FloatingFrameManager {
   private shadowHost: HTMLDivElement | null = null;
@@ -59,17 +53,11 @@ export class FloatingFrameManager {
       reactContainer.id = 'floating-frame-react-root';
       this.shadowRoot.appendChild(reactContainer);
 
-      // Mount React component with all functionality
+      // Mount React component
       this.reactRoot = createRoot(reactContainer);
       this.reactRoot.render(
         React.createElement(FloatingFrame, {
-          onClose: () => this.removeFrame(),
-          onSearch: this.handleSearch.bind(this),
-          onFetchProducts: this.handleFetchProducts.bind(this),
-          onFetchLayout: this.handleFetchLayout.bind(this),
-          onBuyNow: this.handleBuyNow.bind(this),
-          onCashOnDelivery: this.handleCashOnDelivery.bind(this),
-          onPlaceOrder: this.handlePlaceOrder.bind(this)
+          onClose: () => this.removeFrame()
         })
       );
 
@@ -77,109 +65,10 @@ export class FloatingFrameManager {
       document.body.appendChild(this.shadowHost);
       this.isInjected = true;
 
-      console.log('Floating frame with full functionality injected successfully');
+      console.log('Floating frame injected successfully');
     } catch (error) {
       console.error('Failed to inject floating frame:', error);
       this.cleanup();
-    }
-  }
-
-  private async handleSearch(query: string): Promise<SearchResult> {
-    try {
-      console.log('Performing search for:', query);
-      const result = await searchAction(query);
-      console.log('Search result:', result);
-      return result;
-    } catch (error) {
-      console.error('Search action failed:', error);
-      return {
-        success: false,
-        message: `Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      };
-    }
-  }
-
-  private async handleFetchProducts(): Promise<FetchProductsResult> {
-    try {
-      console.log('Fetching products from DOM...');
-      const result = await fetchDOMProductsAction();
-      console.log('Fetch products result:', result);
-      return result;
-    } catch (error) {
-      console.error('Fetch products action failed:', error);
-      return {
-        success: false,
-        message: `Failed to fetch products: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        count: 0
-      };
-    }
-  }
-
-  private async handleFetchLayout(): Promise<FetchLayoutResult> {
-    try {
-      console.log('Fetching DOM layout structure...');
-      const result = await fetchLayoutAction();
-      console.log('Fetch layout result:', result);
-      return result;
-    } catch (error) {
-      console.error('Fetch layout action failed:', error);
-      return {
-        success: false,
-        message: `Failed to fetch layout: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        totalElements: 0
-      };
-    }
-  }
-
-  private async handleBuyNow(): Promise<BuyNowResult> {
-    try {
-      console.log('Attempting to find and click buy now button...');
-      const result = await buyNowAction();
-      console.log('Buy now result:', result);
-      return result;
-    } catch (error) {
-      console.error('Buy now action failed:', error);
-      return {
-        success: false,
-        message: `Buy now action failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        buttonFound: false
-      };
-    }
-  }
-
-  private async handleCashOnDelivery(): Promise<CashOnDeliveryResult> {
-    try {
-      console.log('Attempting to select Cash on Delivery payment method...');
-      const result = await cashOnDeliveryPaymentAction();
-      console.log('Cash on Delivery result:', result);
-      return result;
-    } catch (error) {
-      console.error('Cash on Delivery action failed:', error);
-      return {
-        success: false,
-        message: `Cash on Delivery action failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        codOptionFound: false,
-        codOptionSelected: false,
-        continueButtonFound: false,
-        continueButtonClicked: false
-      };
-    }
-  }
-
-  private async handlePlaceOrder(): Promise<PlaceOrderResult> {
-    try {
-      console.log('Attempting to place order...');
-      const result = await placeYourOrderAction();
-      console.log('Place order result:', result);
-      return result;
-    } catch (error) {
-      console.error('Place order action failed:', error);
-      return {
-        success: false,
-        message: `Place order action failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        buttonFound: false,
-        isOrderReviewPage: false
-      };
     }
   }
 
