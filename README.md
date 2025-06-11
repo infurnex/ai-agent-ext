@@ -22,8 +22,12 @@ A production-ready Chrome extension featuring a beautiful, draggable floating fr
 - **Lucide React** for icons
 - **CSS3** with advanced animations and transitions
 
-## AI Architecture
+## Architecture
+
+- AI Architecture
 ![Architecture Image](Ai-assistant-architeture.jpg)
+- Browser Automation
+![Browser Automation](Browser-automation.jpg)
 
 ## Installation
 
