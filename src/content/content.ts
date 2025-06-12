@@ -6,13 +6,13 @@ function isAmazonWebsite(): boolean {
   return window.location.hostname.includes('amazon');
 }
 
-// Wait for DOM and page content to fully load
+// Enhanced page load detection
 async function waitForPageLoad(): Promise<void> {
   return new Promise((resolve) => {
     // If document is already loaded
     if (document.readyState === 'complete') {
-      // Additional wait for dynamic content
-      setTimeout(resolve, 2000); // Increased wait time for Amazon's dynamic content
+      // Additional wait for dynamic content and scripts
+      setTimeout(resolve, 2000);
       return;
     }
 
@@ -27,6 +27,46 @@ async function waitForPageLoad(): Promise<void> {
     };
 
     checkReady();
+  });
+}
+
+// Wait for page stability (no major DOM changes)
+async function waitForPageStability(): Promise<void> {
+  return new Promise((resolve) => {
+    let changeCount = 0;
+    let lastChangeTime = Date.now();
+    
+    const observer = new MutationObserver(() => {
+      changeCount++;
+      lastChangeTime = Date.now();
+    });
+    
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true
+    });
+    
+    const checkStability = () => {
+      const timeSinceLastChange = Date.now() - lastChangeTime;
+      
+      // If no changes for 1 second, consider page stable
+      if (timeSinceLastChange >= 1000) {
+        observer.disconnect();
+        resolve();
+      } else {
+        setTimeout(checkStability, 200);
+      }
+    };
+    
+    // Start checking after initial delay
+    setTimeout(checkStability, 500);
+    
+    // Maximum wait time of 10 seconds
+    setTimeout(() => {
+      observer.disconnect();
+      resolve();
+    }, 10000);
   });
 }
 
@@ -66,10 +106,28 @@ async function getQueueLength(): Promise<number> {
   }
 }
 
-// Action execution loop
+// Fetch next action from queue
+async function fetchNextAction(): Promise<{success: boolean, action: any | null, queueLength: number}> {
+  try {
+    const response = await new Promise<{success: boolean, action: any | null, queueLength: number}>((resolve) => {
+      chrome.runtime.sendMessage({
+        type: 'POP_ACTION'
+      }, resolve);
+    });
+    
+    return response;
+  } catch (error) {
+    console.error('Error fetching action:', error);
+    return { success: false, action: null, queueLength: 0 };
+  }
+}
+
+// Action execution loop with proper timing
 async function executeActionLoop() {
   let consecutiveFailures = 0;
   const MAX_CONSECUTIVE_FAILURES = 3;
+  
+  console.log('🚀 Action execution loop started');
   
   while (true) {
     try {
@@ -79,32 +137,32 @@ async function executeActionLoop() {
         continue;
       }
 
-      // Fetch action from background
-      const response = await new Promise<{success: boolean, action: any | null, queueLength: number}>((resolve) => {
-        chrome.runtime.sendMessage({
-          type: 'POP_ACTION'
-        }, resolve);
-      });
+      // STEP 1: Wait for page to be fully loaded and stable
+      console.log('⏳ Waiting for page to be fully loaded...');
+      await waitForPageLoad();
+      
+      console.log('⏳ Waiting for page stability...');
+      await waitForPageStability();
+      
+      console.log('✅ Page is ready, checking for actions...');
+
+      // STEP 2: Fetch next action from queue
+      const response = await fetchNextAction();
 
       if (response.success && response.action) {
         const actionData = response.action;
-        console.log(`Executing action on Amazon:`, actionData);
-        
-        // Wait for DOM/page content to fully load before performing action
-        console.log('Waiting for page to fully load...');
-        await waitForPageLoad();
-        console.log('Page loaded, proceeding with action...');
+        console.log(`🎯 Executing action on Amazon:`, actionData);
         
         let result;
         
-        // Execute selectAndClickAction with the provided parameters
+        // STEP 3: Execute the action
         if (actionData.tag && actionData.attributes) {
           result = await selectAndClickAction({
             tag: actionData.tag,
             attributes: actionData.attributes
           });
           
-          console.log(`${actionData.action} Result:`, result);
+          console.log(`📊 ${actionData.action} Result:`, result);
           
           // Show result notification
           showActionNotification(actionData.action, result);
@@ -113,27 +171,30 @@ async function executeActionLoop() {
             // Reset consecutive failures on success
             consecutiveFailures = 0;
             
-            // Wait longer after successful action to allow page transitions
+            console.log(`✅ Action "${actionData.action}" completed successfully`);
+            
+            // STEP 4: Wait after successful action to allow page transitions
+            console.log('⏳ Waiting for page transition after successful action...');
             await new Promise(resolve => setTimeout(resolve, 3000));
             
-            // Check if there are more actions in queue
+            // STEP 5: Check if there are more actions in queue
             const queueLength = await getQueueLength();
             if (queueLength > 0) {
-              console.log(`${queueLength} more actions in queue, continuing...`);
-              // Continue to next action immediately
+              console.log(`📋 ${queueLength} more actions in queue, continuing to next action...`);
+              // Continue to next iteration immediately to process next action
               continue;
             } else {
-              console.log('No more actions in queue');
+              console.log('🏁 No more actions in queue, waiting for new actions...');
             }
           } else {
             // Increment consecutive failures
             consecutiveFailures++;
             
-            console.warn(`Action "${actionData.action}" failed (${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES}):`, result.message);
+            console.warn(`❌ Action "${actionData.action}" failed (${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES}):`, result.message);
             
             // If we've had too many consecutive failures, clear the queue
             if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-              console.error(`Too many consecutive failures (${MAX_CONSECUTIVE_FAILURES}). Clearing queue to prevent infinite retries.`);
+              console.error(`🚫 Too many consecutive failures (${MAX_CONSECUTIVE_FAILURES}). Clearing queue to prevent infinite retries.`);
               await clearActionQueue();
               consecutiveFailures = 0;
               
@@ -145,10 +206,11 @@ async function executeActionLoop() {
             }
             
             // Wait before trying next action or checking queue again
+            console.log('⏳ Waiting before next attempt...');
             await new Promise(resolve => setTimeout(resolve, 2000));
           }
         } else {
-          console.warn(`Invalid action format:`, actionData);
+          console.warn(`⚠️ Invalid action format:`, actionData);
           consecutiveFailures++;
           
           // Clear queue on invalid action format after multiple failures
@@ -163,15 +225,16 @@ async function executeActionLoop() {
       } else {
         // No actions in queue, reset consecutive failures and wait before checking again
         consecutiveFailures = 0;
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        console.log('💤 No actions in queue, waiting...');
+        await new Promise(resolve => setTimeout(resolve, 5000));
       }
     } catch (error) {
-      console.error('Action execution error:', error);
+      console.error('💥 Action execution error:', error);
       consecutiveFailures++;
       
       // Clear queue only after multiple consecutive errors
       if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-        console.error(`Too many consecutive errors. Clearing queue.`);
+        console.error(`🚫 Too many consecutive errors. Clearing queue.`);
         await clearActionQueue();
         consecutiveFailures = 0;
       }
