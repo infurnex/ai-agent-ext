@@ -12,7 +12,7 @@ async function waitForPageLoad(): Promise<void> {
     // If document is already loaded
     if (document.readyState === 'complete') {
       // Additional wait for dynamic content
-      setTimeout(resolve, 1000);
+      setTimeout(resolve, 2000); // Increased wait time for Amazon's dynamic content
       return;
     }
 
@@ -20,7 +20,7 @@ async function waitForPageLoad(): Promise<void> {
     const checkReady = () => {
       if (document.readyState === 'complete') {
         // Additional wait for dynamic content and scripts
-        setTimeout(resolve, 1000);
+        setTimeout(resolve, 2000);
       } else {
         setTimeout(checkReady, 100);
       }
@@ -50,8 +50,27 @@ async function clearActionQueue(): Promise<void> {
   }
 }
 
+// Get queue length
+async function getQueueLength(): Promise<number> {
+  try {
+    const response = await new Promise<{success: boolean, queueLength: number}>((resolve) => {
+      chrome.runtime.sendMessage({
+        type: 'GET_QUEUE_LENGTH'
+      }, resolve);
+    });
+    
+    return response.success ? response.queueLength : 0;
+  } catch (error) {
+    console.error('Error getting queue length:', error);
+    return 0;
+  }
+}
+
 // Action execution loop
 async function executeActionLoop() {
+  let consecutiveFailures = 0;
+  const MAX_CONSECUTIVE_FAILURES = 3;
+  
   while (true) {
     try {
       // Only execute actions on Amazon websites
@@ -87,34 +106,76 @@ async function executeActionLoop() {
           
           console.log(`${actionData.action} Result:`, result);
           
-          // If action failed, clear the queue to prevent further actions
-          if (!result.success) {
-            console.warn(`Action "${actionData.action}" failed. Clearing remaining actions from queue.`);
-            await clearActionQueue();
-            showActionNotification(actionData.action, result);
-            // Continue the loop but queue is now empty
-            await new Promise(resolve => setTimeout(resolve, 3000));
-            continue;
-          }
-          
           // Show result notification
           showActionNotification(actionData.action, result);
+          
+          if (result.success) {
+            // Reset consecutive failures on success
+            consecutiveFailures = 0;
+            
+            // Wait longer after successful action to allow page transitions
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            // Check if there are more actions in queue
+            const queueLength = await getQueueLength();
+            if (queueLength > 0) {
+              console.log(`${queueLength} more actions in queue, continuing...`);
+              // Continue to next action immediately
+              continue;
+            } else {
+              console.log('No more actions in queue');
+            }
+          } else {
+            // Increment consecutive failures
+            consecutiveFailures++;
+            
+            console.warn(`Action "${actionData.action}" failed (${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES}):`, result.message);
+            
+            // If we've had too many consecutive failures, clear the queue
+            if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+              console.error(`Too many consecutive failures (${MAX_CONSECUTIVE_FAILURES}). Clearing queue to prevent infinite retries.`);
+              await clearActionQueue();
+              consecutiveFailures = 0;
+              
+              // Show error notification
+              showActionNotification('Queue Cleared', {
+                success: false,
+                message: `Cleared queue after ${MAX_CONSECUTIVE_FAILURES} consecutive failures`
+              });
+            }
+            
+            // Wait before trying next action or checking queue again
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
         } else {
           console.warn(`Invalid action format:`, actionData);
-          // Clear queue on invalid action format
-          await clearActionQueue();
+          consecutiveFailures++;
+          
+          // Clear queue on invalid action format after multiple failures
+          if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+            await clearActionQueue();
+            consecutiveFailures = 0;
+          }
         }
         
         // Small delay between actions
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 1000));
       } else {
-        // No actions in queue, wait before checking again
+        // No actions in queue, reset consecutive failures and wait before checking again
+        consecutiveFailures = 0;
         await new Promise(resolve => setTimeout(resolve, 3000));
       }
     } catch (error) {
       console.error('Action execution error:', error);
-      // Clear queue on execution error
-      await clearActionQueue();
+      consecutiveFailures++;
+      
+      // Clear queue only after multiple consecutive errors
+      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+        console.error(`Too many consecutive errors. Clearing queue.`);
+        await clearActionQueue();
+        consecutiveFailures = 0;
+      }
+      
       // Wait before retrying on error
       await new Promise(resolve => setTimeout(resolve, 5000));
     }
