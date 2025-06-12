@@ -350,13 +350,12 @@ const FloatingFrame: React.FC<FloatingFrameProps> = memo(({ onClose }) => {
           action: "selecting cod option",
           tag: "input",
           attributes: { "value": "instrumentId=0h_PE_CUS_18b1c868-2e63-40e2-8b24-414fe05d88c8%2FCash&isExpired=false&paymentMethod=COD&tfxEligible=false", "type": "radio" }
-        },
-        {
+        })
+      selectedActions.push({
           action: "confirming payment option",
           tag: "input",
           attributes: { "type": "submit", "aria-labelledby": "checkout-primary-continue-button-id-announce" }
-        }
-      );
+      });
     }
     
     if (checkoutOptions.placeOrder) {
